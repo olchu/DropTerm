@@ -33,13 +33,38 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         panel.makeKey()
         terminalSurface.focusTerminal()
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.22
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(frames.visible, display: true)
+        isVisible = true
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            panel.setFrame(frames.visible, display: true)
+            return
         }
 
-        isVisible = true
+        let overshoot = frames.visible.offsetBy(dx: 0, dy: 12)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.24
+            context.timingFunction = CAMediaTimingFunction(
+                controlPoints: 0.16,
+                0.78,
+                0.28,
+                1
+            )
+            panel.animator().setFrame(overshoot, display: true)
+        } completionHandler: { [weak self] in
+            Task { @MainActor in
+                guard let self, self.isVisible else { return }
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.14
+                    context.timingFunction = CAMediaTimingFunction(
+                        controlPoints: 0.22,
+                        0.72,
+                        0.36,
+                        1
+                    )
+                    self.panel.animator().setFrame(frames.visible, display: true)
+                }
+            }
+        }
     }
 
     func hide() {
