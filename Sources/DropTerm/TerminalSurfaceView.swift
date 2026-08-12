@@ -21,7 +21,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
         terminalView = OutputObservingTerminalView(
             frame: .zero,
             font: Self.preferredTerminalFont(settings: settings),
-            options: TerminalOptions()
+            options: TerminalOptions(cursorStyle: Self.cursorStyle(settings: settings))
         )
         super.init(frame: .zero)
         terminalView.processDelegate = self
@@ -137,6 +137,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
             || terminalView.font.pointSize != preferredFont.pointSize {
             terminalView.font = preferredFont
         }
+        terminalView.terminal.setCursorStyle(Self.cursorStyle(settings: settings))
 
         lastAvailableSize = .zero
         needsLayout = true
@@ -435,6 +436,17 @@ final class TerminalSurfaceView: NSVisualEffectView {
         }
 
         return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    private static func cursorStyle(settings: AppSettings) -> CursorStyle {
+        switch (settings.cursorShape, settings.cursorBlink) {
+        case (.bar, false): .steadyBar
+        case (.bar, true): .blinkBar
+        case (.block, false): .steadyBlock
+        case (.block, true): .blinkBlock
+        case (.underline, false): .steadyUnderline
+        case (.underline, true): .blinkUnderline
+        }
     }
 }
 

@@ -51,6 +51,12 @@ struct SettingsView: View {
                     range: 10...28,
                     valueLabel: "\(Int(settings.fontSize)) pt"
                 )
+                Picker("Cursor style", selection: $settings.cursorShape) {
+                    ForEach(AppSettings.CursorShape.allCases) { shape in
+                        Text(shape.title).tag(shape)
+                    }
+                }
+                Toggle("Blink cursor", isOn: $settings.cursorBlink)
                 TextField("Shell", text: $settings.shellPath)
                 LabeledContent("Starting folder") {
                     HStack(spacing: 8) {

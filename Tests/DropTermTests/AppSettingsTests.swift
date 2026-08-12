@@ -23,6 +23,8 @@ struct AppSettingsTests {
         settings.hideOnDeactivate = true
         settings.showOnLaunch = false
         settings.globalShortcut = GlobalShortcut(keyCode: 49, modifiers: 768)
+        settings.cursorShape = .underline
+        settings.cursorBlink = true
 
         let restored = AppSettings(defaults: defaults)
         #expect(restored.panelHeightRatio == 0.55)
@@ -36,6 +38,8 @@ struct AppSettingsTests {
         #expect(restored.hideOnDeactivate)
         #expect(!restored.showOnLaunch)
         #expect(restored.globalShortcut == GlobalShortcut(keyCode: 49, modifiers: 768))
+        #expect(restored.cursorShape == .underline)
+        #expect(restored.cursorBlink)
     }
 
     @Test("Stored numeric values are clamped to supported ranges")

@@ -4,6 +4,21 @@ import Observation
 @MainActor
 @Observable
 final class AppSettings {
+    enum CursorShape: String, CaseIterable, Identifiable {
+        case bar
+        case block
+        case underline
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .bar: "Olchu Bar"
+            case .block: "Block"
+            case .underline: "Underline"
+            }
+        }
+    }
+
     static let shared = AppSettings(defaults: persistentDefaults())
 
     var panelHeightRatio: Double {
@@ -52,6 +67,14 @@ final class AppSettings {
             defaults.set(Int(globalShortcut.modifiers), forKey: Key.hotKeyModifiers.rawValue)
             onHotKeyChange?()
         }
+    }
+
+    var cursorShape: CursorShape {
+        didSet { persist(cursorShape.rawValue, for: .cursorShape) }
+    }
+
+    var cursorBlink: Bool {
+        didSet { persist(cursorBlink, for: .cursorBlink) }
     }
 
     @ObservationIgnored
@@ -112,6 +135,10 @@ final class AppSettings {
         } else {
             globalShortcut = .defaultShortcut
         }
+        cursorShape = CursorShape(
+            rawValue: defaults.string(forKey: Key.cursorShape.rawValue) ?? ""
+        ) ?? .bar
+        cursorBlink = defaults.object(forKey: Key.cursorBlink.rawValue) as? Bool ?? false
     }
 
     private static func persistentDefaults() -> UserDefaults {
@@ -156,5 +183,7 @@ final class AppSettings {
         case showOnLaunch = "behavior.showOnLaunch"
         case hotKeyCode = "behavior.hotKeyCode"
         case hotKeyModifiers = "behavior.hotKeyModifiers"
+        case cursorShape = "terminal.cursorShape"
+        case cursorBlink = "terminal.cursorBlink"
     }
 }
