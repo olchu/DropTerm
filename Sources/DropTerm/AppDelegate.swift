@@ -73,6 +73,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panelController.selectAllText()
     }
 
+    @objc private func newTab() { panelController.newTab() }
+    @objc private func closeCurrentTab() { panelController.closeCurrentTab() }
+    @objc private func selectTab(_ sender: NSMenuItem) { panelController.selectTab(sender.tag) }
+    @objc private func selectNextTab() { panelController.selectNextTab() }
+    @objc private func selectPreviousTab() { panelController.selectPreviousTab() }
+
     @objc private func quit() {
         NSApp.terminate(nil)
     }
@@ -125,6 +131,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         selectAllItem.target = self
         editItem.submenu = editMenu
         mainMenu.addItem(editItem)
+
+        let shellItem = NSMenuItem()
+        let shellMenu = NSMenu(title: "Shell")
+        let newTabItem = shellMenu.addItem(withTitle: "New Tab", action: #selector(newTab), keyEquivalent: "t")
+        newTabItem.target = self
+        let closeTabItem = shellMenu.addItem(withTitle: "Close Tab", action: #selector(closeCurrentTab), keyEquivalent: "w")
+        closeTabItem.target = self
+        shellMenu.addItem(.separator())
+        for index in 0..<9 {
+            let item = shellMenu.addItem(withTitle: "Select Tab \(index + 1)", action: #selector(selectTab(_:)), keyEquivalent: "\(index + 1)")
+            item.tag = index
+            item.target = self
+        }
+        shellMenu.addItem(.separator())
+        let nextItem = shellMenu.addItem(withTitle: "Next Tab", action: #selector(selectNextTab), keyEquivalent: "\t")
+        nextItem.keyEquivalentModifierMask = [.control]
+        nextItem.target = self
+        let previousItem = shellMenu.addItem(withTitle: "Previous Tab", action: #selector(selectPreviousTab), keyEquivalent: "\t")
+        previousItem.keyEquivalentModifierMask = [.control, .shift]
+        previousItem.target = self
+        shellItem.submenu = shellMenu
+        mainMenu.addItem(shellItem)
 
         NSApp.mainMenu = mainMenu
     }

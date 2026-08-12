@@ -1,11 +1,14 @@
 import AppKit
-import SwiftTerm
+@preconcurrency import SwiftTerm
 
 @MainActor
 final class TerminalSurfaceView: NSVisualEffectView {
+    var onTitleChange: ((String) -> Void)?
+    var onProcessTermination: (() -> Void)?
+
     private let cornerRadius: CGFloat = 18
     private let settings: AppSettings
-    private let terminalView: LocalProcessTerminalView
+    private let terminalView: OutputObservingTerminalView
     private let dimmingView = PassthroughView()
     private let copyOutputButton = NSButton()
     private var keyboardMonitor: Any?
@@ -15,12 +18,16 @@ final class TerminalSurfaceView: NSVisualEffectView {
 
     init(settings: AppSettings) {
         self.settings = settings
-        terminalView = LocalProcessTerminalView(
+        terminalView = OutputObservingTerminalView(
             frame: .zero,
             font: Self.preferredTerminalFont(settings: settings),
             options: TerminalOptions()
         )
         super.init(frame: .zero)
+        terminalView.processDelegate = self
+        terminalView.onDataReceived = { [weak self] in
+            self?.refreshCopyOutputAvailability()
+        }
         configureAppearance()
         installDimmingView()
         installTerminalView()
@@ -142,6 +149,13 @@ final class TerminalSurfaceView: NSVisualEffectView {
         focusTerminal()
     }
 
+    func setActive(_ isActive: Bool) {
+        isHidden = !isActive
+        if isActive {
+            refreshCopyOutputAvailability()
+        }
+    }
+
     private func configureAppearance() {
         material = .hudWindow
         isEmphasized = false
@@ -176,7 +190,8 @@ final class TerminalSurfaceView: NSVisualEffectView {
     private func installKeyboardShortcuts() {
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self,
-                  event.window === self.window else {
+                  event.window === self.window,
+                  event.window?.firstResponder === self.terminalView else {
                 return event
             }
 
@@ -208,6 +223,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
         copyOutputButton.target = self
         copyOutputButton.action = #selector(copyLastOutput(_:))
         copyOutputButton.translatesAutoresizingMaskIntoConstraints = false
+        copyOutputButton.isHidden = true
         addSubview(copyOutputButton)
 
         let bottomConstraint = copyOutputButton.bottomAnchor.constraint(
@@ -258,6 +274,10 @@ final class TerminalSurfaceView: NSVisualEffectView {
             start: Position(col: 0, row: firstRow),
             end: Position(col: terminal.cols - 1, row: lastRow)
         ).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func refreshCopyOutputAvailability() {
+        copyOutputButton.isHidden = lastCommandOutput()?.isEmpty != false
     }
 
     private func startSessionIfNeeded() {
@@ -410,6 +430,38 @@ final class TerminalSurfaceView: NSVisualEffectView {
         }
 
         return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+}
+
+extension TerminalSurfaceView: @preconcurrency LocalProcessTerminalViewDelegate {
+    func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
+
+    func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else { return }
+        onTitleChange?(trimmedTitle)
+    }
+
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        guard let directory, !directory.isEmpty else { return }
+        let path = URL(string: directory)?.path ?? directory
+        let name = URL(fileURLWithPath: path).lastPathComponent
+        onTitleChange?(name.isEmpty ? "~" : name)
+    }
+
+    func processTerminated(source: TerminalView, exitCode: Int32?) {
+        onProcessTermination?()
+    }
+}
+
+private final class OutputObservingTerminalView: LocalProcessTerminalView {
+    var onDataReceived: (() -> Void)?
+
+    override func dataReceived(slice: ArraySlice<UInt8>) {
+        super.dataReceived(slice: slice)
+        DispatchQueue.main.async { [weak self] in
+            self?.onDataReceived?()
+        }
     }
 }
 
