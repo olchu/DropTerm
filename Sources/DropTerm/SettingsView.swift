@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 
 struct SettingsView: View {
@@ -71,7 +72,10 @@ struct SettingsView: View {
             }
 
             Section("Behavior") {
-                LabeledContent("Global shortcut", value: "⇧⌘E")
+                LabeledContent("Global shortcut") {
+                    HotKeyRecorder(shortcut: $settings.globalShortcut)
+                        .frame(width: 150, height: 28)
+                }
                 Toggle("Hide when focus moves to another app", isOn: $settings.hideOnDeactivate)
                 Toggle("Show terminal when DropTerm launches", isOn: $settings.showOnLaunch)
             }
@@ -114,5 +118,79 @@ struct SettingsView: View {
                     .frame(width: 52, alignment: .trailing)
             }
         }
+    }
+}
+
+private struct HotKeyRecorder: NSViewRepresentable {
+    @Binding var shortcut: GlobalShortcut
+
+    func makeNSView(context: Context) -> RecorderButton {
+        let button = RecorderButton()
+        button.onShortcut = { shortcut = $0 }
+        return button
+    }
+
+    func updateNSView(_ button: RecorderButton, context: Context) {
+        button.shortcut = shortcut
+        button.onShortcut = { shortcut = $0 }
+    }
+}
+
+private final class RecorderButton: NSButton {
+    var shortcut: GlobalShortcut = .defaultShortcut { didSet { refreshTitle() } }
+    var onShortcut: ((GlobalShortcut) -> Void)?
+    private var isRecording = false
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        bezelStyle = .rounded
+        target = self
+        action = #selector(beginRecording)
+        refreshTitle()
+    }
+
+    required init?(coder: NSCoder) { nil }
+    override var acceptsFirstResponder: Bool { true }
+
+    @objc private func beginRecording() {
+        isRecording = true
+        title = "Press shortcut…"
+        window?.makeFirstResponder(self)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        guard isRecording else { return super.keyDown(with: event) }
+        if event.keyCode == UInt16(kVK_Escape) {
+            isRecording = false
+            refreshTitle()
+            return
+        }
+
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        var carbonModifiers: UInt32 = 0
+        if flags.contains(.command) { carbonModifiers |= UInt32(cmdKey) }
+        if flags.contains(.shift) { carbonModifiers |= UInt32(shiftKey) }
+        if flags.contains(.option) { carbonModifiers |= UInt32(optionKey) }
+        if flags.contains(.control) { carbonModifiers |= UInt32(controlKey) }
+        guard carbonModifiers != 0 else {
+            NSSound.beep()
+            return
+        }
+
+        shortcut = GlobalShortcut(keyCode: UInt32(event.keyCode), modifiers: carbonModifiers)
+        isRecording = false
+        refreshTitle()
+        onShortcut?(shortcut)
+    }
+
+    override func resignFirstResponder() -> Bool {
+        isRecording = false
+        refreshTitle()
+        return super.resignFirstResponder()
+    }
+
+    private func refreshTitle() {
+        guard !isRecording else { return }
+        title = shortcut.displayName
     }
 }

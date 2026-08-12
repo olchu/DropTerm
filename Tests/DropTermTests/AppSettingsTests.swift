@@ -22,6 +22,7 @@ struct AppSettingsTests {
         settings.startingDirectory = "/tmp"
         settings.hideOnDeactivate = true
         settings.showOnLaunch = false
+        settings.globalShortcut = GlobalShortcut(keyCode: 49, modifiers: 768)
 
         let restored = AppSettings(defaults: defaults)
         #expect(restored.panelHeightRatio == 0.55)
@@ -34,6 +35,7 @@ struct AppSettingsTests {
         #expect(restored.startingDirectory == "/tmp")
         #expect(restored.hideOnDeactivate)
         #expect(!restored.showOnLaunch)
+        #expect(restored.globalShortcut == GlobalShortcut(keyCode: 49, modifiers: 768))
     }
 
     @Test("Stored numeric values are clamped to supported ranges")

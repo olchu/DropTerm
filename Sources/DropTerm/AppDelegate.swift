@@ -14,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installMainMenu()
         installStatusItem()
         installGlobalHotKey()
+        settings.onHotKeyChange = { [weak self] in
+            self?.installGlobalHotKey()
+        }
 
         if settings.showOnLaunch {
             Task { @MainActor [panelController] in
@@ -181,12 +184,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func installGlobalHotKey() {
+        hotKeyService?.invalidate()
+        hotKeyService = nil
         do {
-            hotKeyService = try GlobalHotKeyService.shiftCommandE { [weak self] in
+            hotKeyService = try GlobalHotKeyService.register(shortcut: settings.globalShortcut) { [weak self] in
                 self?.panelController.toggle()
             }
         } catch {
-            NSLog("DropTerm could not register Shift-Command-E: %@", error.localizedDescription)
+            NSLog("DropTerm could not register %@: %@", settings.globalShortcut.displayName, error.localizedDescription)
         }
     }
 }

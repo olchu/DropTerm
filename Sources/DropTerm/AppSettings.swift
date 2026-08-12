@@ -46,8 +46,19 @@ final class AppSettings {
         didSet { persist(showOnLaunch, for: .showOnLaunch) }
     }
 
+    var globalShortcut: GlobalShortcut {
+        didSet {
+            defaults.set(Int(globalShortcut.keyCode), forKey: Key.hotKeyCode.rawValue)
+            defaults.set(Int(globalShortcut.modifiers), forKey: Key.hotKeyModifiers.rawValue)
+            onHotKeyChange?()
+        }
+    }
+
     @ObservationIgnored
     var onChange: (@MainActor () -> Void)?
+
+    @ObservationIgnored
+    var onHotKeyChange: (@MainActor () -> Void)?
 
     @ObservationIgnored
     private let defaults: UserDefaults
@@ -92,6 +103,15 @@ final class AppSettings {
             ?? FileManager.default.homeDirectoryForCurrentUser.path
         hideOnDeactivate = defaults.object(forKey: Key.hideOnDeactivate.rawValue) as? Bool ?? false
         showOnLaunch = defaults.object(forKey: Key.showOnLaunch.rawValue) as? Bool ?? true
+        if defaults.object(forKey: Key.hotKeyCode.rawValue) != nil,
+           defaults.object(forKey: Key.hotKeyModifiers.rawValue) != nil {
+            globalShortcut = GlobalShortcut(
+                keyCode: UInt32(defaults.integer(forKey: Key.hotKeyCode.rawValue)),
+                modifiers: UInt32(defaults.integer(forKey: Key.hotKeyModifiers.rawValue))
+            )
+        } else {
+            globalShortcut = .defaultShortcut
+        }
     }
 
     private static func persistentDefaults() -> UserDefaults {
@@ -134,5 +154,7 @@ final class AppSettings {
         case startingDirectory = "terminal.startingDirectory"
         case hideOnDeactivate = "behavior.hideOnDeactivate"
         case showOnLaunch = "behavior.showOnLaunch"
+        case hotKeyCode = "behavior.hotKeyCode"
+        case hotKeyModifiers = "behavior.hotKeyModifiers"
     }
 }
