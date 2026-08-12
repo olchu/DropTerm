@@ -6,8 +6,7 @@ struct DropTermApp: App {
 
     var body: some Scene {
         Settings {
-            SettingsView()
+            SettingsView(settings: .shared)
         }
     }
 }
-

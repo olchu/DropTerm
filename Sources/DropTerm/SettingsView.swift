@@ -2,11 +2,9 @@ import AppKit
 import SwiftUI
 
 struct SettingsView: View {
-    @State private var settings = AppSettings.shared
+    @Bindable var settings: AppSettings
 
     var body: some View {
-        @Bindable var settings = settings
-
         Form {
             Section("Appearance") {
                 sliderRow(

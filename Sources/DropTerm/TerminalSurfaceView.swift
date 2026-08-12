@@ -3,10 +3,12 @@ import SwiftTerm
 
 @MainActor
 final class TerminalSurfaceView: NSVisualEffectView {
+    private let cornerRadius: CGFloat = 18
     private let settings: AppSettings
     private let terminalView: LocalProcessTerminalView
     private var hasStartedSession = false
     private var lastAvailableSize: CGSize = .zero
+    private var bottomBackdropHeight: CGFloat = 0
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -34,7 +36,12 @@ final class TerminalSurfaceView: NSVisualEffectView {
         super.layout()
 
         let padding = CGFloat(settings.contentPadding)
-        let availableFrame = bounds.insetBy(dx: padding, dy: padding)
+        let availableFrame = CGRect(
+            x: bounds.minX + padding,
+            y: bounds.minY + bottomBackdropHeight + padding,
+            width: max(0, bounds.width - padding * 2),
+            height: max(0, bounds.height - bottomBackdropHeight - padding * 2)
+        )
         guard availableFrame.width > 0, availableFrame.height > 0 else { return }
 
         if lastAvailableSize != availableFrame.size {
@@ -66,6 +73,13 @@ final class TerminalSurfaceView: NSVisualEffectView {
         hasStartedSession = false
     }
 
+    func setBottomBackdropHeight(_ height: CGFloat) {
+        guard bottomBackdropHeight != height else { return }
+        bottomBackdropHeight = max(0, height)
+        lastAvailableSize = .zero
+        needsLayout = true
+    }
+
     func applySettings() {
         layer?.backgroundColor = NSColor.black
             .withAlphaComponent(settings.backgroundOpacity)
@@ -85,6 +99,9 @@ final class TerminalSurfaceView: NSVisualEffectView {
         blendingMode = .behindWindow
         state = .active
         wantsLayer = true
+        layer?.cornerRadius = cornerRadius
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
     }
 
     private func installTerminalView() {

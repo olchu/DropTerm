@@ -23,7 +23,8 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
     func show() {
         guard let screen = screenUnderPointer() ?? NSScreen.main else { return }
 
-        let frames = layout.frames(in: screen.visibleFrame)
+        let frames = layout.frames(screenFrame: screen.frame, visibleFrame: screen.visibleFrame)
+        terminalSurface.setBottomBackdropHeight(layout.bottomBackdropHeight(for: screen))
         panel.setFrame(frames.hidden, display: false)
         panel.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
@@ -41,7 +42,7 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
 
     func hide() {
         guard let screen = panel.screen ?? NSScreen.main else { return }
-        let hiddenFrame = layout.frames(in: screen.visibleFrame).hidden
+        let hiddenFrame = layout.frames(screenFrame: screen.frame, visibleFrame: screen.visibleFrame).hidden
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.18
@@ -74,7 +75,12 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         panel.hidesOnDeactivate = settings.hideOnDeactivate
 
         guard isVisible, let screen = panel.screen ?? NSScreen.main else { return }
-        panel.setFrame(layout.frames(in: screen.visibleFrame).visible, display: true, animate: false)
+        terminalSurface.setBottomBackdropHeight(layout.bottomBackdropHeight(for: screen))
+        panel.setFrame(
+            layout.frames(screenFrame: screen.frame, visibleFrame: screen.visibleFrame).visible,
+            display: true,
+            animate: false
+        )
         terminalSurface.focusTerminal()
     }
 
@@ -116,16 +122,23 @@ struct PanelFrames: Equatable {
 
 struct PanelLayout {
     var heightRatio = 0.4
+    var verticalMargin: CGFloat = 10
 
-    func frames(in visibleFrame: CGRect) -> PanelFrames {
+    func frames(screenFrame: CGRect, visibleFrame: CGRect) -> PanelFrames {
         let height = max(240, visibleFrame.height * heightRatio)
+        let panelBottom = screenFrame.minY
+        let panelTop = visibleFrame.minY + verticalMargin + height
         let visible = CGRect(
-            x: visibleFrame.minX,
-            y: visibleFrame.minY,
-            width: visibleFrame.width,
-            height: height
+            x: screenFrame.minX,
+            y: panelBottom,
+            width: screenFrame.width,
+            height: panelTop - panelBottom
         )
-        let hidden = visible.offsetBy(dx: 0, dy: -height - 16)
+        let hidden = visible.offsetBy(dx: 0, dy: -visible.height - 16)
         return PanelFrames(visible: visible, hidden: hidden)
+    }
+
+    func bottomBackdropHeight(for screen: NSScreen) -> CGFloat {
+        max(0, screen.visibleFrame.minY - screen.frame.minY) + verticalMargin
     }
 }

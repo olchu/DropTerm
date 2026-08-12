@@ -19,10 +19,16 @@ The repository currently contains the product specification, architecture decisi
 ## Open locally
 
 ```sh
-open Package.swift
+open DropTerm.xcodeproj
 ```
 
-Xcode can open the Swift package directly. Select the `DropTerm` scheme and run it. The terminal panel appears immediately, and a terminal icon remains in the macOS menu bar for show/hide and quit commands. Press Shift+Command+E globally to show or hide the panel while keeping the shell session alive.
+Select the `DropTerm` scheme and run it. The app target has the stable bundle identifier `com.olchu.DropTerm` and uses the configured Apple Development Team, allowing macOS to remember Files & Folders permissions across rebuilds. The terminal panel appears immediately, and a terminal icon remains in the macOS menu bar for show/hide and quit commands. Press Shift+Command+E globally to show or hide the panel while keeping the shell session alive.
+
+Regenerate the Xcode project after changing its structure with:
+
+```sh
+ruby scripts/generate_xcode_project.rb
+```
 
 Command-line verification:
 

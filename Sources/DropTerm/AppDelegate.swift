@@ -4,6 +4,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = AppSettings.shared
     private lazy var panelController = TerminalPanelController(settings: settings)
+    private lazy var settingsWindowController = SettingsWindowController(settings: settings)
     private var hotKeyService: GlobalHotKeyService?
     private var statusItem: NSStatusItem?
 
@@ -31,8 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        NSApp.activate(ignoringOtherApps: true)
+        settingsWindowController.present()
     }
 
     @objc private func quit() {
@@ -56,6 +56,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         appItem.submenu = appMenu
+
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+
         NSApp.mainMenu = mainMenu
     }
 
