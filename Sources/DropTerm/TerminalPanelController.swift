@@ -11,7 +11,7 @@ final class TerminalPanelController {
         isVisible ? hide() : show()
     }
 
-    private func show() {
+    func show() {
         guard let screen = screenUnderPointer() ?? NSScreen.main else { return }
 
         let frames = layout.frames(in: screen.visibleFrame)
@@ -29,7 +29,7 @@ final class TerminalPanelController {
         isVisible = true
     }
 
-    private func hide() {
+    func hide() {
         guard let screen = panel.screen ?? NSScreen.main else { return }
         let hiddenFrame = layout.frames(in: screen.visibleFrame).hidden
 
@@ -91,4 +91,3 @@ struct PanelLayout {
         return PanelFrames(visible: visible, hidden: hidden)
     }
 }
-

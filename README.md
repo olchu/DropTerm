@@ -19,7 +19,7 @@ The repository currently contains the product specification, architecture decisi
 open Package.swift
 ```
 
-Xcode can open the Swift package directly. Select the `DropTerm` scheme and run it. The current shortcut is available from the menu bar; global shortcut registration and the terminal engine are the first implementation milestone.
+Xcode can open the Swift package directly. Select the `DropTerm` scheme and run it. The prototype panel appears immediately, and a terminal icon remains in the macOS menu bar for show/hide and quit commands. Global shortcut registration and the terminal engine are the first implementation milestone.
 
 Command-line verification:
 
@@ -33,4 +33,3 @@ swift test
 - [Architecture](Docs/ARCHITECTURE.md)
 - [Roadmap](Docs/ROADMAP.md)
 - [Decisions and open questions](Docs/DECISIONS.md)
-

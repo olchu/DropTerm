@@ -3,10 +3,18 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let panelController = TerminalPanelController()
+    private var statusItem: NSStatusItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         installMainMenu()
+        installStatusItem()
+
+        // Make the prototype discoverable when launched from Xcode.
+        // Later this can become a persisted "show on launch" preference.
+        DispatchQueue.main.async { [panelController] in
+            panelController.show()
+        }
     }
 
     @objc private func toggleTerminal() {
@@ -41,5 +49,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appItem.submenu = appMenu
         NSApp.mainMenu = mainMenu
     }
-}
 
+    private func installStatusItem() {
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem.button?.image = NSImage(
+            systemSymbolName: "terminal.fill",
+            accessibilityDescription: "DropTerm"
+        )
+        statusItem.button?.toolTip = "DropTerm"
+
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Show or Hide DropTerm", action: #selector(toggleTerminal), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit DropTerm", action: #selector(quit), keyEquivalent: "")
+
+        for item in menu.items {
+            item.target = self
+        }
+
+        statusItem.menu = menu
+        self.statusItem = statusItem
+    }
+}
