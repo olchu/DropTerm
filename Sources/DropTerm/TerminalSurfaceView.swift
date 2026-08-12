@@ -7,6 +7,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
     private let settings: AppSettings
     private let terminalView: LocalProcessTerminalView
     private let copyOutputButton = NSButton()
+    private var keyboardMonitor: Any?
     private var hasStartedSession = false
     private var lastAvailableSize: CGSize = .zero
     private var bottomBackdropHeight: CGFloat = 0
@@ -21,6 +22,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
         super.init(frame: .zero)
         configureAppearance()
         installTerminalView()
+        installKeyboardShortcuts()
         installCopyOutputButton()
         applySettings()
     }
@@ -102,6 +104,10 @@ final class TerminalSurfaceView: NSVisualEffectView {
 
     func terminateSession() {
         guard hasStartedSession else { return }
+        if let keyboardMonitor {
+            NSEvent.removeMonitor(keyboardMonitor)
+            self.keyboardMonitor = nil
+        }
         terminalView.terminate()
         hasStartedSession = false
     }
@@ -127,6 +133,13 @@ final class TerminalSurfaceView: NSVisualEffectView {
         needsLayout = true
     }
 
+    func applyStartingDirectory() {
+        guard hasStartedSession else { return }
+        let command = "builtin cd -- \(shellQuote(startingDirectory()))\n"
+        terminalView.terminal.sendUserInput(Array(command.utf8)[...])
+        focusTerminal()
+    }
+
     private func configureAppearance() {
         material = .hudWindow
         blendingMode = .behindWindow
@@ -150,6 +163,30 @@ final class TerminalSurfaceView: NSVisualEffectView {
         addSubview(terminalView)
     }
 
+    private func installKeyboardShortcuts() {
+        keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  event.window === self.window,
+                  self.window?.firstResponder === self.terminalView else {
+                return event
+            }
+
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers == .command,
+                  let key = event.charactersIgnoringModifiers?.lowercased() else {
+                return event
+            }
+
+            switch key {
+            case "c": self.copySelection()
+            case "v": self.pasteClipboard()
+            case "a": self.selectAllText()
+            default: return event
+            }
+            return nil
+        }
+    }
+
     private func installCopyOutputButton() {
         copyOutputButton.bezelStyle = .recessed
         copyOutputButton.isBordered = false
@@ -164,9 +201,13 @@ final class TerminalSurfaceView: NSVisualEffectView {
         copyOutputButton.translatesAutoresizingMaskIntoConstraints = false
         addSubview(copyOutputButton)
 
+        let bottomConstraint = copyOutputButton.bottomAnchor.constraint(
+            equalTo: bottomAnchor,
+            constant: -14
+        )
         NSLayoutConstraint.activate([
-            copyOutputButton.topAnchor.constraint(equalTo: topAnchor, constant: 14),
             copyOutputButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            bottomConstraint,
             copyOutputButton.widthAnchor.constraint(equalToConstant: 30),
             copyOutputButton.heightAnchor.constraint(equalToConstant: 30)
         ])
@@ -232,7 +273,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
             executable: shell,
             environment: environment,
             execName: "-\(executableName)",
-            currentDirectory: FileManager.default.homeDirectoryForCurrentUser.path
+            currentDirectory: startingDirectory()
         )
         focusTerminal()
     }
@@ -245,21 +286,54 @@ final class TerminalSurfaceView: NSVisualEffectView {
         return configuredShell
     }
 
+    private func startingDirectory() -> String {
+        let expandedPath = NSString(string: settings.startingDirectory).expandingTildeInPath
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: expandedPath, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            return FileManager.default.homeDirectoryForCurrentUser.path
+        }
+        return expandedPath
+    }
+
     private func prepareZshIntegration() -> URL? {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("com.olchu.DropTerm", isDirectory: true)
-        let rcFile = directory.appendingPathComponent(".zshrc")
-        let userRC = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".zshrc").path
-        let script = """
-        [[ -r \(shellQuote(userRC)) ]] && source \(shellQuote(userRC))
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let integration = """
         autoload -Uz add-zsh-hook
         _dropterm_preexec() { printf '\\e]133;C\\a' }
         _dropterm_precmd() {
+          # Persist every completed command immediately. DropTerm can close
+          # the PTY without giving an interactive shell time to exit cleanly.
+          [[ -n "$HISTFILE" ]] && fc -AI "$HISTFILE"
           printf '\\e]133;D\\a\\e]133;A\\a'
         }
         add-zsh-hook preexec _dropterm_preexec
         add-zsh-hook precmd _dropterm_precmd
+
+        # Prefix-aware history navigation. Oh My Zsh ships this plugin, but it
+        # is not enabled in every user configuration. Load it only for
+        # DropTerm and bind both normal and application-cursor sequences.
+        if [[ -r "$ZSH/plugins/history-substring-search/history-substring-search.plugin.zsh" ]]; then
+          HISTORY_SUBSTRING_SEARCH_PREFIXED=true
+          source "$ZSH/plugins/history-substring-search/history-substring-search.plugin.zsh"
+          bindkey -M emacs '^[[A' history-substring-search-up
+          bindkey -M emacs '^[OA' history-substring-search-up
+          bindkey -M emacs '^[[B' history-substring-search-down
+          bindkey -M emacs '^[OB' history-substring-search-down
+          bindkey -M viins '^[[A' history-substring-search-up
+          bindkey -M viins '^[OA' history-substring-search-up
+          bindkey -M viins '^[[B' history-substring-search-down
+          bindkey -M viins '^[OB' history-substring-search-down
+          [[ -n "$terminfo[kcuu1]" ]] && bindkey -M emacs "$terminfo[kcuu1]" history-substring-search-up
+          [[ -n "$terminfo[kcud1]" ]] && bindkey -M emacs "$terminfo[kcud1]" history-substring-search-down
+        else
+          bindkey -M emacs '^[[A' history-beginning-search-backward
+          bindkey -M emacs '^[OA' history-beginning-search-backward
+          bindkey -M emacs '^[[B' history-beginning-search-forward
+          bindkey -M emacs '^[OB' history-beginning-search-forward
+        fi
         """
 
         do {
@@ -267,7 +341,35 @@ final class TerminalSurfaceView: NSVisualEffectView {
                 at: directory,
                 withIntermediateDirectories: true
             )
-            try script.write(to: rcFile, atomically: true, encoding: .utf8)
+
+            for fileName in [".zshenv", ".zprofile", ".zlogin"] {
+                let userFile = home.appendingPathComponent(fileName).path
+                let wrapper = "[[ -r \(shellQuote(userFile)) ]] && source \(shellQuote(userFile))\n"
+                try wrapper.write(
+                    to: directory.appendingPathComponent(fileName),
+                    atomically: true,
+                    encoding: .utf8
+                )
+            }
+
+            let userRC = home.appendingPathComponent(".zshrc").path
+            let rcWrapper = """
+            [[ -r \(shellQuote(userRC)) ]] && source \(shellQuote(userRC))
+            \(integration)
+            """
+            try rcWrapper.write(
+                to: directory.appendingPathComponent(".zshrc"),
+                atomically: true,
+                encoding: .utf8
+            )
+
+            let userLogout = home.appendingPathComponent(".zlogout").path
+            let logoutWrapper = "[[ -r \(shellQuote(userLogout)) ]] && source \(shellQuote(userLogout))\n"
+            try logoutWrapper.write(
+                to: directory.appendingPathComponent(".zlogout"),
+                atomically: true,
+                encoding: .utf8
+            )
             return directory
         } catch {
             return nil

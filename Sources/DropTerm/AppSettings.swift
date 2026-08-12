@@ -4,7 +4,7 @@ import Observation
 @MainActor
 @Observable
 final class AppSettings {
-    static let shared = AppSettings()
+    static let shared = AppSettings(defaults: persistentDefaults())
 
     var panelHeightRatio: Double {
         didSet { persist(panelHeightRatio, for: .panelHeightRatio) }
@@ -28,6 +28,10 @@ final class AppSettings {
 
     var shellPath: String {
         didSet { persist(shellPath, for: .shellPath) }
+    }
+
+    var startingDirectory: String {
+        didSet { persist(startingDirectory, for: .startingDirectory) }
     }
 
     var hideOnDeactivate: Bool {
@@ -74,8 +78,24 @@ final class AppSettings {
         shellPath = defaults.string(forKey: Key.shellPath.rawValue)
             ?? ProcessInfo.processInfo.environment["SHELL"]
             ?? "/bin/zsh"
+        startingDirectory = defaults.string(forKey: Key.startingDirectory.rawValue)
+            ?? FileManager.default.homeDirectoryForCurrentUser.path
         hideOnDeactivate = defaults.object(forKey: Key.hideOnDeactivate.rawValue) as? Bool ?? false
         showOnLaunch = defaults.object(forKey: Key.showOnLaunch.rawValue) as? Bool ?? true
+    }
+
+    private static func persistentDefaults() -> UserDefaults {
+        guard let defaults = UserDefaults(suiteName: "com.olchu.DropTerm") else {
+            return .standard
+        }
+
+        let legacyDefaults = UserDefaults.standard
+        for key in Key.allCases where defaults.object(forKey: key.rawValue) == nil {
+            if let value = legacyDefaults.object(forKey: key.rawValue) {
+                defaults.set(value, forKey: key.rawValue)
+            }
+        }
+        return defaults
     }
 
     private func persist(_ value: Any, for key: Key) {
@@ -93,13 +113,14 @@ final class AppSettings {
         return min(max(defaults.double(forKey: key.rawValue), range.lowerBound), range.upperBound)
     }
 
-    private enum Key: String {
+    private enum Key: String, CaseIterable {
         case panelHeightRatio = "panel.heightRatio"
         case backgroundOpacity = "appearance.backgroundOpacity"
         case contentPadding = "appearance.contentPadding"
         case fontSize = "terminal.fontSize"
         case fontName = "terminal.fontName"
         case shellPath = "terminal.shellPath"
+        case startingDirectory = "terminal.startingDirectory"
         case hideOnDeactivate = "behavior.hideOnDeactivate"
         case showOnLaunch = "behavior.showOnLaunch"
     }

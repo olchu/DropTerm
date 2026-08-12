@@ -18,6 +18,7 @@ struct AppSettingsTests {
         settings.fontSize = 16
         settings.fontName = "Menlo"
         settings.shellPath = "/bin/zsh"
+        settings.startingDirectory = "/tmp"
         settings.hideOnDeactivate = true
         settings.showOnLaunch = false
 
@@ -28,6 +29,7 @@ struct AppSettingsTests {
         #expect(restored.fontSize == 16)
         #expect(restored.fontName == "Menlo")
         #expect(restored.shellPath == "/bin/zsh")
+        #expect(restored.startingDirectory == "/tmp")
         #expect(restored.hideOnDeactivate)
         #expect(!restored.showOnLaunch)
     }

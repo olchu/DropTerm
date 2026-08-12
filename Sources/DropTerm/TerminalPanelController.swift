@@ -6,10 +6,12 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
     private let terminalSurface: TerminalSurfaceView
     private lazy var panel = makePanel()
     private var isVisible = false
+    private var appliedStartingDirectory: String
 
     init(settings: AppSettings = .shared) {
         self.settings = settings
         terminalSurface = TerminalSurfaceView(settings: settings)
+        appliedStartingDirectory = settings.startingDirectory
         super.init()
         settings.onChange = { [weak self] in
             self?.applySettings()
@@ -88,6 +90,10 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
 
     private func applySettings() {
         terminalSurface.applySettings()
+        if appliedStartingDirectory != settings.startingDirectory {
+            appliedStartingDirectory = settings.startingDirectory
+            terminalSurface.applyStartingDirectory()
+        }
         panel.hidesOnDeactivate = settings.hideOnDeactivate
 
         guard isVisible, let screen = panel.screen ?? NSScreen.main else { return }

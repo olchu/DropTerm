@@ -41,7 +41,21 @@ struct SettingsView: View {
                     valueLabel: "\(Int(settings.fontSize)) pt"
                 )
                 TextField("Shell", text: $settings.shellPath)
-                Text("Changing the shell takes effect after restarting DropTerm.")
+                LabeledContent("Starting folder") {
+                    HStack(spacing: 8) {
+                        TextField("~/Documents/projects", text: $settings.startingDirectory)
+                            .frame(minWidth: 250)
+                        Button("Choose…", action: chooseStartingDirectory)
+                        Button {
+                            settings.startingDirectory = FileManager.default
+                                .homeDirectoryForCurrentUser.path
+                        } label: {
+                            Image(systemName: "house")
+                        }
+                        .help("Use home folder")
+                    }
+                }
+                Text("Shell and starting folder changes apply to the next terminal session.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -53,7 +67,25 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 480)
+        .frame(width: 620, height: 520)
+    }
+
+    private func chooseStartingDirectory() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Starting Folder"
+        panel.prompt = "Choose"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+
+        let expandedPath = NSString(string: settings.startingDirectory).expandingTildeInPath
+        if FileManager.default.fileExists(atPath: expandedPath) {
+            panel.directoryURL = URL(fileURLWithPath: expandedPath, isDirectory: true)
+        }
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        settings.startingDirectory = url.path
     }
 
     private func sliderRow(
