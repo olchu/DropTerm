@@ -172,7 +172,12 @@ final class TerminalSurfaceView: NSVisualEffectView {
         terminalView.nativeForegroundColor = .white
         terminalView.nativeBackgroundColor = .clear
         terminalView.backgroundOpacity = 0
-        terminalView.caretColor = .white
+        terminalView.caretColor = NSColor(
+            calibratedRed: 1.0,
+            green: 0.294,
+            blue: 0.271,
+            alpha: 1
+        )
         terminalView.optionAsMetaKey = true
         terminalView.subviews
             .compactMap { $0 as? NSScroller }
