@@ -61,6 +61,22 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         terminalSurface.terminateSession()
     }
 
+    func copyLastCommandOutput() {
+        terminalSurface.copyLastCommandOutput()
+    }
+
+    func copySelection() {
+        terminalSurface.copySelection()
+    }
+
+    func pasteClipboard() {
+        terminalSurface.pasteClipboard()
+    }
+
+    func selectAllText() {
+        terminalSurface.selectAllText()
+    }
+
     func windowDidResignKey(_ notification: Notification) {
         guard settings.hideOnDeactivate, isVisible else { return }
         hide()

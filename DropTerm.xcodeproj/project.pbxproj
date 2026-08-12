@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1124E2F36428AEAE20648EF9 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98931F2688F0DFB1423F6AA0 /* Cocoa.framework */; };
+		1575D4AD35EA23CC23F643AD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 89ABC22E7CD6FC9DE06D462A /* Assets.xcassets */; };
 		48C9A109B8CE4A7B40C11426 /* GlobalHotKeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49082E412BF299462448C064 /* GlobalHotKeyService.swift */; };
 		57AF67695801214DEE120D28 /* PanelLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3447D17E66B4D5565A51C4E /* PanelLayoutTests.swift */; };
 		7276CD075E8A25F7A368C5E0 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91DC7227234A71912F068FE /* AppSettings.swift */; };
@@ -40,6 +41,7 @@
 		4CD1948E679AE1094D0F008A /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		68F9AE91FBF5146A54AA1825 /* AppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7AE4D2CEE329EE1A25B1B53E /* DropTerm.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DropTerm.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		89ABC22E7CD6FC9DE06D462A /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		98931F2688F0DFB1423F6AA0 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		9CC10BF77BB84A3CD5103029 /* DropTermApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DropTermApp.swift; sourceTree = "<group>"; };
 		C3447D17E66B4D5565A51C4E /* PanelLayoutTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PanelLayoutTests.swift; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 				475BD98D10FB841CD31382C1 /* Frameworks */,
 				DFCC720C2C23C2289BD93550 /* DropTerm */,
 				78366C058EEDE0BD191E63CB /* DropTermTests */,
+				9C84A485750767E9CD93DAF9 /* Resources */,
 			);
 			sourceTree = "<group>";
 		};
@@ -95,6 +98,15 @@
 			);
 			name = DropTermTests;
 			path = Tests/DropTermTests;
+			sourceTree = "<group>";
+		};
+		9C84A485750767E9CD93DAF9 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				89ABC22E7CD6FC9DE06D462A /* Assets.xcassets */,
+			);
+			name = Resources;
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		A381D122608C0F2DC4A3288E /* OS X */ = {
@@ -216,6 +228,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1575D4AD35EA23CC23F643AD /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -271,7 +284,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DropTerm;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "DropTerm needs access so your shell can work with files in Documents.";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
@@ -371,7 +384,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DropTerm;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "DropTerm needs access so your shell can work with files in Documents.";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;

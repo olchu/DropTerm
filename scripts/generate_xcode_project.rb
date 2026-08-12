@@ -8,6 +8,7 @@ project = Xcodeproj::Project.new(project_path)
 
 sources_group = project.main_group.new_group("DropTerm", "Sources/DropTerm")
 tests_group = project.main_group.new_group("DropTermTests", "Tests/DropTermTests")
+resources_group = project.main_group.new_group("Resources", "Resources")
 app_target = project.new_target(:application, "DropTerm", :osx, "15.0")
 test_target = project.new_target(:unit_test_bundle, "DropTermTests", :osx, "15.0")
 test_target.add_dependency(app_target)
@@ -19,6 +20,9 @@ end
 Dir.glob(File.join(root, "Tests/DropTermTests/*.swift")).sort.each do |path|
   test_target.source_build_phase.add_file_reference(tests_group.new_file(path))
 end
+
+asset_catalog = resources_group.new_file("Assets.xcassets")
+app_target.resources_build_phase.add_file_reference(asset_catalog)
 
 swift_term = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
 swift_term.repositoryURL = "https://github.com/migueldeicaza/SwiftTerm.git"
@@ -46,9 +50,10 @@ app_target.build_configurations.each do |configuration|
   settings["SWIFT_VERSION"] = "6.0"
   settings["MACOSX_DEPLOYMENT_TARGET"] = "15.0"
   settings["GENERATE_INFOPLIST_FILE"] = "YES"
+  settings["ASSETCATALOG_COMPILER_APPICON_NAME"] = "AppIcon"
   settings["INFOPLIST_KEY_CFBundleDisplayName"] = "DropTerm"
   settings["INFOPLIST_KEY_LSApplicationCategoryType"] = "public.app-category.utilities"
-  settings["INFOPLIST_KEY_LSUIElement"] = "YES"
+  settings["INFOPLIST_KEY_LSUIElement"] = "NO"
   settings["INFOPLIST_KEY_NSDocumentsFolderUsageDescription"] = "DropTerm needs access so your shell can work with files in Documents."
   # A local terminal must launch the user's shell without App Sandbox restrictions.
   settings["ENABLE_APP_SANDBOX"] = "NO"

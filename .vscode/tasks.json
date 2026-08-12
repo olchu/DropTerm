@@ -1,0 +1,45 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build DropTerm.app (Debug)",
+            "type": "shell",
+            "command": "xcodebuild",
+            "args": [
+                "-project", "DropTerm.xcodeproj",
+                "-scheme", "DropTerm",
+                "-configuration", "Debug",
+                "-derivedDataPath", ".build/xcode",
+                "build"
+            ],
+            "group": "build",
+            "problemMatcher": ["$swiftc"]
+        },
+        {
+            "label": "Build DropTerm.app (Release)",
+            "type": "shell",
+            "command": "xcodebuild",
+            "args": [
+                "-project", "DropTerm.xcodeproj",
+                "-scheme", "DropTerm",
+                "-configuration", "Release",
+                "-derivedDataPath", ".build/xcode",
+                "build"
+            ],
+            "group": "build",
+            "problemMatcher": ["$swiftc"]
+        },
+        {
+            "label": "Run DropTerm.app",
+            "type": "shell",
+            "command": "open",
+            "args": [
+                "-n",
+                "${workspaceFolder}/.build/xcode/Build/Products/Debug/DropTerm.app"
+            ],
+            "dependsOn": "Build DropTerm.app (Debug)",
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        }
+    ]
+}

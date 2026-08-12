@@ -1,24 +1,3 @@
 {
-    "configurations": [
-        {
-            "type": "swift",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:DropTerm}",
-            "name": "Debug DropTerm",
-            "target": "DropTerm",
-            "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug DropTerm"
-        },
-        {
-            "type": "swift",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:DropTerm}",
-            "name": "Release DropTerm",
-            "target": "DropTerm",
-            "configuration": "release",
-            "preLaunchTask": "swift: Build Release DropTerm"
-        }
-    ]
+    "configurations": []
 }
