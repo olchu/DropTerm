@@ -3,6 +3,7 @@ import SwiftTerm
 
 @MainActor
 final class TerminalSurfaceView: NSVisualEffectView {
+    private let contentPadding: CGFloat = 14
     private let terminalView: LocalProcessTerminalView
     private var hasStartedSession = false
 
@@ -40,13 +41,15 @@ final class TerminalSurfaceView: NSVisualEffectView {
         material = .hudWindow
         blendingMode = .behindWindow
         state = .active
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.12).cgColor
     }
 
     private func installTerminalView() {
         terminalView.translatesAutoresizingMaskIntoConstraints = false
         terminalView.nativeForegroundColor = .white
-        terminalView.nativeBackgroundColor = NSColor.black.withAlphaComponent(0.12)
-        terminalView.backgroundOpacity = 0.12
+        terminalView.nativeBackgroundColor = .clear
+        terminalView.backgroundOpacity = 0
         terminalView.caretColor = .white
         terminalView.optionAsMetaKey = true
         terminalView.subviews
@@ -55,10 +58,10 @@ final class TerminalSurfaceView: NSVisualEffectView {
         addSubview(terminalView)
 
         NSLayoutConstraint.activate([
-            terminalView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            terminalView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            terminalView.topAnchor.constraint(equalTo: topAnchor),
-            terminalView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            terminalView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: contentPadding),
+            terminalView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -contentPadding),
+            terminalView.topAnchor.constraint(equalTo: topAnchor, constant: contentPadding),
+            terminalView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -contentPadding)
         ])
     }
 
