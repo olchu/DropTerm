@@ -83,11 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installGlobalHotKey() {
         do {
-            hotKeyService = try GlobalHotKeyService.optionSpace { [weak self] in
+            hotKeyService = try GlobalHotKeyService.shiftCommandE { [weak self] in
                 self?.panelController.toggle()
             }
         } catch {
-            NSLog("DropTerm could not register Option-Space: %@", error.localizedDescription)
+            NSLog("DropTerm could not register Shift-Command-E: %@", error.localizedDescription)
         }
     }
 }

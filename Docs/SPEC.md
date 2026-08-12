@@ -18,7 +18,7 @@ As a macOS user, I press a configurable global shortcut from any application, im
 
 ### Window behavior
 
-- A global shortcut shows or hides the panel. Default proposal: Option+Space.
+- A global shortcut shows or hides the panel. Default: Shift+Command+E.
 - The panel opens on the display containing the mouse pointer.
 - It slides from the bottom edge and occupies 40% of the display's visible height.
 - It is borderless, floats above normal windows, and does not create a normal Dock window.
@@ -87,4 +87,3 @@ As a macOS user, I press a configurable global shortcut from any application, im
 - Quake-style top-edge mode and custom placement.
 - Shell integration for current directory, command status, and semantic selection.
 - Session restoration after application restart where technically safe.
-

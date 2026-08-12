@@ -16,6 +16,6 @@
 1. Product name and bundle identifier.
 2. Terminal engine selection after a short proof-of-concept comparison.
 3. Direct distribution, Mac App Store, or both. Sandboxing constraints can influence PTY design.
-4. Default shortcut: Option+Space may conflict with existing launchers or input-source shortcuts.
+4. Default shortcut: Shift+Command+E may conflict with an existing application shortcut.
 5. Whether the panel appears on the pointer display or the currently focused window's display.
 6. Whether closing the app should terminate the shell immediately or request confirmation when a foreground job is active.

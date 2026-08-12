@@ -21,10 +21,10 @@ final class GlobalHotKeyService {
     private var hotKey: EventHotKeyRef?
     private let action: @MainActor () -> Void
 
-    static func optionSpace(action: @escaping @MainActor () -> Void) throws -> GlobalHotKeyService {
+    static func shiftCommandE(action: @escaping @MainActor () -> Void) throws -> GlobalHotKeyService {
         try GlobalHotKeyService(
-            keyCode: UInt32(kVK_Space),
-            modifiers: UInt32(optionKey),
+            keyCode: UInt32(kVK_ANSI_E),
+            modifiers: UInt32(cmdKey | shiftKey),
             action: action
         )
     }
