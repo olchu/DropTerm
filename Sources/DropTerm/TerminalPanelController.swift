@@ -90,6 +90,7 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
 
     private func applySettings() {
         terminalSurface.applySettings()
+        panel.alphaValue = settings.panelOpacity
         if appliedStartingDirectory != settings.startingDirectory {
             appliedStartingDirectory = settings.startingDirectory
             terminalSurface.applyStartingDirectory()
@@ -119,6 +120,7 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         panel.hidesOnDeactivate = settings.hideOnDeactivate
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.alphaValue = settings.panelOpacity
         panel.hasShadow = false
         panel.isMovable = false
         panel.contentView = terminalSurface

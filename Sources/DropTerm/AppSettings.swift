@@ -14,6 +14,10 @@ final class AppSettings {
         didSet { persist(backgroundOpacity, for: .backgroundOpacity) }
     }
 
+    var panelOpacity: Double {
+        didSet { persist(panelOpacity, for: .panelOpacity) }
+    }
+
     var contentPadding: Double {
         didSet { persist(contentPadding, for: .contentPadding) }
     }
@@ -61,6 +65,12 @@ final class AppSettings {
             key: .backgroundOpacity,
             default: 0.12,
             range: 0...0.6
+        )
+        panelOpacity = Self.double(
+            in: defaults,
+            key: .panelOpacity,
+            default: 1,
+            range: 0.45...1
         )
         contentPadding = Self.double(
             in: defaults,
@@ -116,6 +126,7 @@ final class AppSettings {
     private enum Key: String, CaseIterable {
         case panelHeightRatio = "panel.heightRatio"
         case backgroundOpacity = "appearance.backgroundOpacity"
+        case panelOpacity = "appearance.panelOpacity"
         case contentPadding = "appearance.contentPadding"
         case fontSize = "terminal.fontSize"
         case fontName = "terminal.fontName"

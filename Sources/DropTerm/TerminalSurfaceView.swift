@@ -6,6 +6,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
     private let cornerRadius: CGFloat = 18
     private let settings: AppSettings
     private let terminalView: LocalProcessTerminalView
+    private let dimmingView = PassthroughView()
     private let copyOutputButton = NSButton()
     private var keyboardMonitor: Any?
     private var hasStartedSession = false
@@ -21,6 +22,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
         )
         super.init(frame: .zero)
         configureAppearance()
+        installDimmingView()
         installTerminalView()
         installKeyboardShortcuts()
         installCopyOutputButton()
@@ -120,7 +122,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
     }
 
     func applySettings() {
-        layer?.backgroundColor = NSColor.black
+        dimmingView.layer?.backgroundColor = NSColor.black
             .withAlphaComponent(settings.backgroundOpacity)
             .cgColor
         let preferredFont = Self.preferredTerminalFont(settings: settings)
@@ -142,6 +144,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
 
     private func configureAppearance() {
         material = .hudWindow
+        isEmphasized = false
         blendingMode = .behindWindow
         state = .active
         wantsLayer = true
@@ -161,6 +164,13 @@ final class TerminalSurfaceView: NSVisualEffectView {
             .compactMap { $0 as? NSScroller }
             .forEach { $0.isHidden = true }
         addSubview(terminalView)
+    }
+
+    private func installDimmingView() {
+        dimmingView.frame = bounds
+        dimmingView.autoresizingMask = [.width, .height]
+        dimmingView.wantsLayer = true
+        addSubview(dimmingView)
     }
 
     private func installKeyboardShortcuts() {
@@ -401,4 +411,8 @@ final class TerminalSurfaceView: NSVisualEffectView {
 
         return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
     }
+}
+
+private final class PassthroughView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

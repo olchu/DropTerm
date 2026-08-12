@@ -17,7 +17,17 @@ struct SettingsView: View {
                     title: "Darkening",
                     value: $settings.backgroundOpacity,
                     range: 0...0.6,
-                    valueLabel: settings.backgroundOpacity.formatted(.percent.precision(.fractionLength(0)))
+                    valueLabel: settings.backgroundOpacity.formatted(
+                        .percent.precision(.fractionLength(0))
+                    )
+                )
+                sliderRow(
+                    title: "App transparency",
+                    value: $settings.panelOpacity,
+                    range: 0.45...1,
+                    valueLabel: settings.panelOpacity.formatted(
+                        .percent.precision(.fractionLength(0))
+                    )
                 )
                 sliderRow(
                     title: "Content padding",

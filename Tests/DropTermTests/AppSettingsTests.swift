@@ -14,6 +14,7 @@ struct AppSettingsTests {
         let settings = AppSettings(defaults: defaults)
         settings.panelHeightRatio = 0.55
         settings.backgroundOpacity = 0.24
+        settings.panelOpacity = 0.72
         settings.contentPadding = 18
         settings.fontSize = 16
         settings.fontName = "Menlo"
@@ -25,6 +26,7 @@ struct AppSettingsTests {
         let restored = AppSettings(defaults: defaults)
         #expect(restored.panelHeightRatio == 0.55)
         #expect(restored.backgroundOpacity == 0.24)
+        #expect(restored.panelOpacity == 0.72)
         #expect(restored.contentPadding == 18)
         #expect(restored.fontSize == 16)
         #expect(restored.fontName == "Menlo")
