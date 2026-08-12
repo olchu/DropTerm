@@ -166,8 +166,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
     private func installKeyboardShortcuts() {
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self,
-                  event.window === self.window,
-                  self.window?.firstResponder === self.terminalView else {
+                  event.window === self.window else {
                 return event
             }
 
