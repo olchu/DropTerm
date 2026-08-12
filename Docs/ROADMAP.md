@@ -11,11 +11,12 @@
 
 ## Phase 1 — Functional terminal MVP
 
-- [ ] Select and integrate a terminal engine after a compatibility spike.
-- [ ] Implement PTY-backed login shell lifecycle.
-- [ ] Propagate terminal size changes to the PTY.
-- [ ] Implement input, selection, clipboard, scrollback, and focus behavior.
-- [ ] Register configurable global shortcut.
+- [x] Select and integrate SwiftTerm as the terminal engine.
+- [x] Implement PTY-backed login shell lifecycle.
+- [x] Propagate terminal size changes to the PTY through SwiftTerm.
+- [x] Implement input, selection, clipboard, scrollback, and focus behavior through SwiftTerm.
+- [x] Register Option+Space as the initial global shortcut.
+- [ ] Make the global shortcut configurable in Settings.
 - [ ] Detect MesloLGS NF and provide a safe fallback.
 - [ ] Validate Powerlevel10k, true color, vim, and tmux acceptance scenarios.
 
@@ -34,4 +35,3 @@
 - [ ] Profiles and themes.
 - [ ] Searchable scrollback.
 - [ ] Shell integration and semantic actions.
-

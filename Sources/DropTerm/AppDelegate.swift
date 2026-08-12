@@ -3,18 +3,26 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let panelController = TerminalPanelController()
+    private var hotKeyService: GlobalHotKeyService?
     private var statusItem: NSStatusItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         installMainMenu()
         installStatusItem()
+        installGlobalHotKey()
 
         // Make the prototype discoverable when launched from Xcode.
         // Later this can become a persisted "show on launch" preference.
         DispatchQueue.main.async { [panelController] in
             panelController.show()
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        hotKeyService?.invalidate()
+        hotKeyService = nil
+        panelController.terminateSession()
     }
 
     @objc private func toggleTerminal() {
@@ -71,5 +79,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem.menu = menu
         self.statusItem = statusItem
+    }
+
+    private func installGlobalHotKey() {
+        do {
+            hotKeyService = try GlobalHotKeyService.optionSpace { [weak self] in
+                self?.panelController.toggle()
+            }
+        } catch {
+            NSLog("DropTerm could not register Option-Space: %@", error.localizedDescription)
+        }
     }
 }

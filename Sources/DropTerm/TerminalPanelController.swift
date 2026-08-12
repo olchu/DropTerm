@@ -1,9 +1,9 @@
 import AppKit
-import SwiftUI
 
 @MainActor
 final class TerminalPanelController {
     private let layout = PanelLayout()
+    private let terminalSurface = TerminalSurfaceView()
     private lazy var panel = makePanel()
     private var isVisible = false
 
@@ -19,6 +19,7 @@ final class TerminalPanelController {
         panel.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKey()
+        terminalSurface.focusTerminal()
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.22
@@ -46,8 +47,12 @@ final class TerminalPanelController {
         isVisible = false
     }
 
+    func terminateSession() {
+        terminalSurface.terminateSession()
+    }
+
     private func makePanel() -> NSPanel {
-        let panel = NSPanel(
+        let panel = DropTermPanel(
             contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
@@ -61,7 +66,7 @@ final class TerminalPanelController {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.isMovable = false
-        panel.contentView = NSHostingView(rootView: TerminalPlaceholderView())
+        panel.contentView = terminalSurface
         return panel
     }
 
@@ -69,6 +74,11 @@ final class TerminalPanelController {
         let pointer = NSEvent.mouseLocation
         return NSScreen.screens.first { $0.frame.contains(pointer) }
     }
+}
+
+private final class DropTermPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 struct PanelFrames: Equatable {
