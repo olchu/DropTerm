@@ -49,6 +49,9 @@ final class TerminalSurfaceView: NSVisualEffectView {
         terminalView.backgroundOpacity = 0.12
         terminalView.caretColor = .white
         terminalView.optionAsMetaKey = true
+        terminalView.subviews
+            .compactMap { $0 as? NSScroller }
+            .forEach { $0.isHidden = true }
         addSubview(terminalView)
 
         NSLayoutConstraint.activate([
