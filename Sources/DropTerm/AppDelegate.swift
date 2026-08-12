@@ -2,7 +2,8 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let panelController = TerminalPanelController()
+    private let settings = AppSettings.shared
+    private lazy var panelController = TerminalPanelController(settings: settings)
     private var hotKeyService: GlobalHotKeyService?
     private var statusItem: NSStatusItem?
 
@@ -12,10 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installStatusItem()
         installGlobalHotKey()
 
-        // Make the prototype discoverable when launched from Xcode.
-        // Later this can become a persisted "show on launch" preference.
-        DispatchQueue.main.async { [panelController] in
-            panelController.show()
+        if settings.showOnLaunch {
+            Task { @MainActor [panelController] in
+                panelController.show()
+            }
         }
     }
 

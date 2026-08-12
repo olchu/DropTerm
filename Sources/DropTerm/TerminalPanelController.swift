@@ -1,11 +1,20 @@
 import AppKit
 
 @MainActor
-final class TerminalPanelController {
-    private let layout = PanelLayout()
-    private let terminalSurface = TerminalSurfaceView()
+final class TerminalPanelController: NSObject, NSWindowDelegate {
+    private let settings: AppSettings
+    private let terminalSurface: TerminalSurfaceView
     private lazy var panel = makePanel()
     private var isVisible = false
+
+    init(settings: AppSettings = .shared) {
+        self.settings = settings
+        terminalSurface = TerminalSurfaceView(settings: settings)
+        super.init()
+        settings.onChange = { [weak self] in
+            self?.applySettings()
+        }
+    }
 
     func toggle() {
         isVisible ? hide() : show()
@@ -51,6 +60,24 @@ final class TerminalPanelController {
         terminalSurface.terminateSession()
     }
 
+    func windowDidResignKey(_ notification: Notification) {
+        guard settings.hideOnDeactivate, isVisible else { return }
+        hide()
+    }
+
+    private var layout: PanelLayout {
+        PanelLayout(heightRatio: settings.panelHeightRatio)
+    }
+
+    private func applySettings() {
+        terminalSurface.applySettings()
+        panel.hidesOnDeactivate = settings.hideOnDeactivate
+
+        guard isVisible, let screen = panel.screen ?? NSScreen.main else { return }
+        panel.setFrame(layout.frames(in: screen.visibleFrame).visible, display: true, animate: false)
+        terminalSurface.focusTerminal()
+    }
+
     private func makePanel() -> NSPanel {
         let panel = DropTermPanel(
             contentRect: .zero,
@@ -61,12 +88,13 @@ final class TerminalPanelController {
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        panel.hidesOnDeactivate = false
+        panel.hidesOnDeactivate = settings.hideOnDeactivate
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.isMovable = false
         panel.contentView = terminalSurface
+        panel.delegate = self
         return panel
     }
 

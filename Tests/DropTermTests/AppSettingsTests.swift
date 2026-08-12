@@ -1,0 +1,48 @@
+import Foundation
+import Testing
+@testable import DropTerm
+
+@MainActor
+@Suite("App settings")
+struct AppSettingsTests {
+    @Test("Values persist across settings instances")
+    func persistence() throws {
+        let suiteName = "DropTermTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = AppSettings(defaults: defaults)
+        settings.panelHeightRatio = 0.55
+        settings.backgroundOpacity = 0.24
+        settings.contentPadding = 18
+        settings.fontSize = 16
+        settings.fontName = "Menlo"
+        settings.shellPath = "/bin/zsh"
+        settings.hideOnDeactivate = true
+        settings.showOnLaunch = false
+
+        let restored = AppSettings(defaults: defaults)
+        #expect(restored.panelHeightRatio == 0.55)
+        #expect(restored.backgroundOpacity == 0.24)
+        #expect(restored.contentPadding == 18)
+        #expect(restored.fontSize == 16)
+        #expect(restored.fontName == "Menlo")
+        #expect(restored.shellPath == "/bin/zsh")
+        #expect(restored.hideOnDeactivate)
+        #expect(!restored.showOnLaunch)
+    }
+
+    @Test("Stored numeric values are clamped to supported ranges")
+    func clamping() throws {
+        let suiteName = "DropTermTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(2.0, forKey: "panel.heightRatio")
+        defaults.set(-1.0, forKey: "appearance.backgroundOpacity")
+
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.panelHeightRatio == 0.8)
+        #expect(settings.backgroundOpacity == 0)
+    }
+}

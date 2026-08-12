@@ -11,6 +11,7 @@ The repository currently contains the product specification, architecture decisi
 - show/hide animation from the bottom of the active display;
 - a real login shell connected through SwiftTerm's PTY-backed terminal view;
 - True Color, Unicode, selection, clipboard, scrollback, and terminal resize support;
+- persistent live settings for height, darkening, padding, font, and focus behavior;
 - minimal MV architecture with injected services;
 - unit-test target;
 - product and technical specifications in `Docs/`.

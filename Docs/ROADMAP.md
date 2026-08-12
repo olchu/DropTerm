@@ -17,12 +17,14 @@
 - [x] Implement input, selection, clipboard, scrollback, and focus behavior through SwiftTerm.
 - [x] Register Shift+Command+E as the initial global shortcut.
 - [ ] Make the global shortcut configurable in Settings.
-- [ ] Detect MesloLGS NF and provide a safe fallback.
+- [x] Detect MesloLGS NF and provide a safe fallback.
 - [ ] Validate Powerlevel10k, true color, vim, and tmux acceptance scenarios.
 
 ## Phase 2 — Product polish
 
-- [ ] Settings window for shortcut, shell, typography, and appearance.
+- [x] Live settings for panel height, darkening, padding, typography, and behavior.
+- [x] Persist settings between launches.
+- [ ] Restart the shell session from Settings after changing its executable.
 - [ ] Launch at login.
 - [ ] Multi-display and Spaces regression coverage.
 - [ ] Accessibility and Reduce Motion behavior.
