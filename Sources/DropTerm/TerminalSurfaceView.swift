@@ -5,8 +5,8 @@ import SwiftTerm
 final class TerminalSurfaceView: NSVisualEffectView {
     private let settings: AppSettings
     private let terminalView: LocalProcessTerminalView
-    private var terminalConstraints: [NSLayoutConstraint] = []
     private var hasStartedSession = false
+    private var lastAvailableSize: CGSize = .zero
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -30,6 +30,32 @@ final class TerminalSurfaceView: NSVisualEffectView {
         startSessionIfNeeded()
     }
 
+    override func layout() {
+        super.layout()
+
+        let padding = CGFloat(settings.contentPadding)
+        let availableFrame = bounds.insetBy(dx: padding, dy: padding)
+        guard availableFrame.width > 0, availableFrame.height > 0 else { return }
+
+        if lastAvailableSize != availableFrame.size {
+            terminalView.frame = availableFrame
+            terminalView.layoutSubtreeIfNeeded()
+            lastAvailableSize = availableFrame.size
+        }
+
+        let gridSize = terminalView.getOptimalFrameSize().size
+        let centeredSize = CGSize(
+            width: min(gridSize.width, availableFrame.width),
+            height: min(gridSize.height, availableFrame.height)
+        )
+        terminalView.frame = CGRect(
+            x: availableFrame.midX - centeredSize.width / 2,
+            y: availableFrame.midY - centeredSize.height / 2,
+            width: centeredSize.width,
+            height: centeredSize.height
+        ).integral
+    }
+
     func focusTerminal() {
         window?.makeFirstResponder(terminalView)
     }
@@ -50,11 +76,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
             terminalView.font = preferredFont
         }
 
-        let padding = CGFloat(settings.contentPadding)
-        terminalConstraints[0].constant = padding
-        terminalConstraints[1].constant = -padding
-        terminalConstraints[2].constant = padding
-        terminalConstraints[3].constant = -padding
+        lastAvailableSize = .zero
         needsLayout = true
     }
 
@@ -66,7 +88,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
     }
 
     private func installTerminalView() {
-        terminalView.translatesAutoresizingMaskIntoConstraints = false
+        terminalView.autoresizingMask = []
         terminalView.nativeForegroundColor = .white
         terminalView.nativeBackgroundColor = .clear
         terminalView.backgroundOpacity = 0
@@ -76,14 +98,6 @@ final class TerminalSurfaceView: NSVisualEffectView {
             .compactMap { $0 as? NSScroller }
             .forEach { $0.isHidden = true }
         addSubview(terminalView)
-
-        terminalConstraints = [
-            terminalView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            terminalView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            terminalView.topAnchor.constraint(equalTo: topAnchor),
-            terminalView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ]
-        NSLayoutConstraint.activate(terminalConstraints)
     }
 
     private func startSessionIfNeeded() {
