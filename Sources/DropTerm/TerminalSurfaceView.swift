@@ -52,10 +52,10 @@ final class TerminalSurfaceView: NSVisualEffectView {
         addSubview(terminalView)
 
         NSLayoutConstraint.activate([
-            terminalView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            terminalView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
-            terminalView.topAnchor.constraint(equalTo: topAnchor, constant: 14),
-            terminalView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10)
+            terminalView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            terminalView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            terminalView.topAnchor.constraint(equalTo: topAnchor),
+            terminalView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 

@@ -64,7 +64,7 @@ final class TerminalPanelController {
         panel.hidesOnDeactivate = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.isMovable = false
         panel.contentView = terminalSurface
         return panel
