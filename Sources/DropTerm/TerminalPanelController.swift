@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 
 @MainActor
 final class TerminalPanelController: NSObject, NSWindowDelegate {
@@ -31,6 +32,7 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         panel.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKey()
+        selectEnglishInputSource()
         terminalTabs.focusTerminal()
 
         isVisible = true
@@ -115,6 +117,10 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         hide()
     }
 
+    func windowDidBecomeKey(_ notification: Notification) {
+        selectEnglishInputSource()
+    }
+
     private var layout: PanelLayout {
         PanelLayout(heightRatio: settings.panelHeightRatio)
     }
@@ -162,6 +168,12 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
     private func screenUnderPointer() -> NSScreen? {
         let pointer = NSEvent.mouseLocation
         return NSScreen.screens.first { $0.frame.contains(pointer) }
+    }
+
+    private func selectEnglishInputSource() {
+        guard let inputSource = TISCopyInputSourceForLanguage("en" as CFString)?.takeRetainedValue()
+        else { return }
+        TISSelectInputSource(inputSource)
     }
 }
 
@@ -297,7 +309,7 @@ private final class TerminalTabsView: NSView {
 
         tabStack.orientation = .horizontal
         tabStack.alignment = .centerY
-        tabStack.spacing = 6
+        tabStack.spacing = 4
         tabStack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         tabScrollView.documentView = tabStack
     }
@@ -332,6 +344,9 @@ private final class TerminalTabsView: NSView {
     private func rebuildTabBar() {
         tabStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for (index, tab) in tabs.enumerated() {
+            if index > 0 {
+                tabStack.addArrangedSubview(TabSeparatorView())
+            }
             let item = AnimatedTabItem(
                 title: tab.title,
                 color: Self.tabColor(for: tab.id),
@@ -349,12 +364,12 @@ private final class TerminalTabsView: NSView {
         tabStack.addArrangedSubview(addSpacer)
 
         let addButton = ArrowCursorButton(
-            title: "＋  ⌘T",
+            title: "+  ⌘T",
             target: self,
             action: #selector(addTabClicked(_:))
         )
         addButton.isBordered = false
-        addButton.font = .systemFont(ofSize: 12, weight: .regular)
+        addButton.font = .systemFont(ofSize: 13, weight: .regular)
         addButton.contentTintColor = .tertiaryLabelColor
         addButton.toolTip = "New Tab (⌘T)"
         tabStack.addArrangedSubview(addButton)
@@ -373,9 +388,10 @@ private final class TerminalTabsView: NSView {
     }
 
     private func scrollSelectedTabToVisible() {
-        guard tabStack.arrangedSubviews.indices.contains(selectedIndex) else { return }
-        tabStack.arrangedSubviews[selectedIndex].scrollToVisible(
-            tabStack.arrangedSubviews[selectedIndex].bounds
+        let arrangedIndex = selectedIndex * 2
+        guard tabStack.arrangedSubviews.indices.contains(arrangedIndex) else { return }
+        tabStack.arrangedSubviews[arrangedIndex].scrollToVisible(
+            tabStack.arrangedSubviews[arrangedIndex].bounds
         )
     }
 
@@ -430,11 +446,9 @@ private final class AnimatedTabItem: NSView {
         addSubview(contentView)
         button.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(button)
-        closeButton.image = NSImage(
-            systemSymbolName: "xmark",
-            accessibilityDescription: "Close tab"
-        )
+        closeButton.title = "×"
         closeButton.isBordered = false
+        closeButton.font = .systemFont(ofSize: 15, weight: .regular)
         closeButton.contentTintColor = .tertiaryLabelColor
         closeButton.toolTip = "Close Tab (⌘W)"
         closeButton.alphaValue = isSelected ? 0.78 : 0.52
@@ -451,7 +465,7 @@ private final class AnimatedTabItem: NSView {
             button.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             button.heightAnchor.constraint(equalToConstant: 26),
             closeButton.leadingAnchor.constraint(equalTo: button.trailingAnchor, constant: 3),
-            closeButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            closeButton.centerYAnchor.constraint(equalTo: button.centerYAnchor, constant: -0.5),
             closeButton.widthAnchor.constraint(equalToConstant: 14),
             closeButton.heightAnchor.constraint(equalToConstant: 14)
         ])
@@ -462,6 +476,7 @@ private final class AnimatedTabItem: NSView {
         self.widthConstraint = widthConstraint
         heightAnchor.constraint(equalToConstant: 32).isActive = true
         updateMagnification(animated: false)
+        installHoverResetObservers()
     }
 
     required init?(coder: NSCoder) { nil }
@@ -493,11 +508,13 @@ private final class AnimatedTabItem: NSView {
     }
 
     override func mouseExited(with event: NSEvent) {
-        isHovered = false
-        updateAppearance(active: selected)
-        updateCloseButtonAppearance(active: selected)
-        updateMagnification(animated: true)
+        resetHover(animated: true)
         super.mouseExited(with: event)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { resetHover(animated: false) }
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -513,8 +530,6 @@ private final class AnimatedTabItem: NSView {
     private func updateMagnification(animated: Bool) {
         let scale: CGFloat = isHovered ? 1.14 : 1
         let transform = CATransform3DMakeScale(scale, scale, 1)
-        // The button is visually scaled on hover, so reserve enough room for
-        // the scaled text plus a small optical gap before the close icon.
         let targetWidth = baseWidth * scale
 
         guard animated, let contentLayer = contentView.layer else {
@@ -566,6 +581,39 @@ private final class AnimatedTabItem: NSView {
             textColor: active ? .secondaryLabelColor : .tertiaryLabelColor,
             animated: true
         )
+    }
+
+    private func resetHover(animated: Bool) {
+        guard isHovered else { return }
+        isHovered = false
+        updateAppearance(active: selected)
+        updateCloseButtonAppearance(active: selected)
+        updateMagnification(animated: animated)
+    }
+
+    private func installHoverResetObservers() {
+        let center = NotificationCenter.default
+        center.addObserver(
+            self,
+            selector: #selector(applicationDidResignActive(_:)),
+            name: NSApplication.didResignActiveNotification,
+            object: NSApp
+        )
+        center.addObserver(
+            self,
+            selector: #selector(windowDidResignKey(_:)),
+            name: NSWindow.didResignKeyNotification,
+            object: nil
+        )
+    }
+
+    @objc private func applicationDidResignActive(_ notification: Notification) {
+        resetHover(animated: false)
+    }
+
+    @objc private func windowDidResignKey(_ notification: Notification) {
+        guard notification.object as? NSWindow === window else { return }
+        resetHover(animated: false)
     }
 }
 
@@ -646,11 +694,37 @@ private final class ColoredTabButton: NSButton {
     }
 }
 
-private final class ArrowCursorView: NSView {
+private class ArrowCursorView: NSView {
     override func resetCursorRects() {
         discardCursorRects()
         addCursorRect(bounds, cursor: .arrow)
     }
+}
+
+private final class TabSeparatorView: ArrowCursorView {
+    private let line = NSView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        translatesAutoresizingMaskIntoConstraints = false
+        widthAnchor.constraint(equalToConstant: 9).isActive = true
+        heightAnchor.constraint(equalToConstant: 28).isActive = true
+
+        line.wantsLayer = true
+        line.layer?.backgroundColor = NSColor.separatorColor
+            .withAlphaComponent(0.18)
+            .cgColor
+        line.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(line)
+        NSLayoutConstraint.activate([
+            line.centerXAnchor.constraint(equalTo: centerXAnchor),
+            line.centerYAnchor.constraint(equalTo: centerYAnchor),
+            line.widthAnchor.constraint(equalToConstant: 1),
+            line.heightAnchor.constraint(equalToConstant: 15)
+        ])
+    }
+
+    required init?(coder: NSCoder) { nil }
 }
 
 private final class ArrowCursorButton: NSButton {
