@@ -16,9 +16,11 @@ final class TerminalSurfaceView: NSVisualEffectView {
     private var lastAvailableSize: CGSize = .zero
     private var bottomBackdropHeight: CGFloat = 0
     private var trailingContentInset: CGFloat = 0
+    private(set) var currentDirectory: String
 
     init(settings: AppSettings) {
         self.settings = settings
+        currentDirectory = NSString(string: settings.startingDirectory).expandingTildeInPath
         terminalView = OutputObservingTerminalView(
             frame: .zero,
             font: Self.preferredTerminalFont(settings: settings),
@@ -502,6 +504,7 @@ extension TerminalSurfaceView: @preconcurrency LocalProcessTerminalViewDelegate 
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
         guard let directory, !directory.isEmpty else { return }
         let path = URL(string: directory)?.path ?? directory
+        currentDirectory = path
         let name = URL(fileURLWithPath: path).lastPathComponent
         onTitleChange?(name.isEmpty ? "~" : name)
     }

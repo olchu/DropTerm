@@ -1,9 +1,11 @@
 import AppKit
 import Carbon.HIToolbox
+import Observation
 import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settings: AppSettings
+    @State private var ollama = OllamaSettingsController()
 
     var body: some View {
         Form {
@@ -85,9 +87,62 @@ struct SettingsView: View {
                 Toggle("Hide when focus moves to another app", isOn: $settings.hideOnDeactivate)
                 Toggle("Show terminal when DropTerm launches", isOn: $settings.showOnLaunch)
             }
+
+            Section("Local AI") {
+                TextField("Ollama URL", text: $settings.ollamaURL)
+                TextField("Model", text: $settings.ollamaModel)
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(ollama.isServerRunning ? Color.green : Color.secondary)
+                        .frame(width: 8, height: 8)
+                    Text(ollama.status)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if !ollama.isInstalled {
+                        Button("Download Ollama") { ollama.downloadInstaller() }
+                    } else if !ollama.isServerRunning {
+                        Button("Launch Ollama") { ollama.launch(settings: settings) }
+                    } else if !ollama.hasSelectedModel(settings.ollamaModel) {
+                        Button("Download model") { ollama.pullSelectedModel(settings: settings) }
+                            .disabled(ollama.isDownloading)
+                    }
+                    Button {
+                        ollama.refresh(settings: settings)
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .help("Refresh Ollama status")
+                    .disabled(ollama.isDownloading)
+                }
+                if ollama.isDownloading {
+                    if let progress = ollama.downloadProgress {
+                        ProgressView(value: progress)
+                    } else {
+                        ProgressView()
+                    }
+                    Text(ollama.downloadStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !ollama.models.isEmpty {
+                    Picker("Installed model", selection: $settings.ollamaModel) {
+                        ForEach(ollama.models) { model in
+                            Text("\(model.name) · \(ollama.formattedSize(model.size))")
+                                .tag(model.name)
+                        }
+                    }
+                }
+                Text("Press ⌘K in the terminal. The generated command is inserted but never run automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 620, height: 520)
+        .task { ollama.refresh(settings: settings) }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            ollama.refresh(settings: settings)
+        }
     }
 
     private func chooseStartingDirectory() {
@@ -124,6 +179,126 @@ struct SettingsView: View {
                     .frame(width: 52, alignment: .trailing)
             }
         }
+    }
+}
+
+@MainActor
+@Observable
+private final class OllamaSettingsController {
+    var isInstalled = false
+    var isServerRunning = false
+    var isDownloading = false
+    var downloadProgress: Double?
+    var downloadStatus = ""
+    var models: [OllamaCommandService.Model] = []
+    var status = "Checking Ollama…"
+
+    private var task: Task<Void, Never>?
+
+    func refresh(settings: AppSettings) {
+        task?.cancel()
+        isInstalled = ollamaApplicationURL() != nil || ollamaCLIExists()
+        status = isInstalled ? "Connecting to Ollama…" : "Ollama is not installed"
+        task = Task {
+            do {
+                let service = OllamaCommandService(
+                    baseURL: settings.ollamaURL,
+                    model: settings.ollamaModel
+                )
+                let installed = try await service.installedModels()
+                guard !Task.isCancelled else { return }
+                models = installed.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                isServerRunning = true
+                isInstalled = true
+                status = models.isEmpty ? "Ollama is running · no models installed" : "Ollama is ready"
+            } catch {
+                guard !Task.isCancelled else { return }
+                models = []
+                isServerRunning = false
+                status = isInstalled ? "Ollama is installed but not running" : "Ollama is not installed"
+            }
+        }
+    }
+
+    func downloadInstaller() {
+        guard let url = URL(string: "https://ollama.com/download/mac") else { return }
+        NSWorkspace.shared.open(url)
+        status = "Install Ollama from the downloaded DMG, then return here"
+    }
+
+    func launch(settings: AppSettings) {
+        guard let appURL = ollamaApplicationURL() else {
+            downloadInstaller()
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { [weak self] _, error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let error {
+                    self.status = "Could not launch Ollama: \(error.localizedDescription)"
+                    return
+                }
+                self.status = "Starting Ollama…"
+                try? await Task.sleep(for: .seconds(2))
+                self.refresh(settings: settings)
+            }
+        }
+    }
+
+    func pullSelectedModel(settings: AppSettings) {
+        let selectedModel = settings.ollamaModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selectedModel.isEmpty else { return }
+        task?.cancel()
+        isDownloading = true
+        downloadProgress = nil
+        downloadStatus = "Preparing \(selectedModel)…"
+        task = Task {
+            do {
+                let service = OllamaCommandService(
+                    baseURL: settings.ollamaURL,
+                    model: selectedModel
+                )
+                try await service.pullModel(selectedModel) { [weak self] progress, status in
+                    self?.downloadProgress = progress
+                    self?.downloadStatus = status
+                }
+                guard !Task.isCancelled else { return }
+                isDownloading = false
+                downloadProgress = 1
+                downloadStatus = "Model installed"
+                refresh(settings: settings)
+            } catch {
+                guard !Task.isCancelled else { return }
+                isDownloading = false
+                downloadProgress = nil
+                downloadStatus = error.localizedDescription
+            }
+        }
+    }
+
+    func hasSelectedModel(_ name: String) -> Bool {
+        models.contains { $0.name == name || $0.name == name + ":latest" }
+    }
+
+    func formattedSize(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    private func ollamaApplicationURL() -> URL? {
+        let fileManager = FileManager.default
+        let candidates = [
+            URL(fileURLWithPath: "/Applications/Ollama.app"),
+            fileManager.homeDirectoryForCurrentUser
+                .appendingPathComponent("Applications/Ollama.app")
+        ]
+        return candidates.first { fileManager.fileExists(atPath: $0.path) }
+    }
+
+    private func ollamaCLIExists() -> Bool {
+        FileManager.default.isExecutableFile(atPath: "/usr/local/bin/ollama")
+            || FileManager.default.isExecutableFile(atPath: "/opt/homebrew/bin/ollama")
     }
 }
 

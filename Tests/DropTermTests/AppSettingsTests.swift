@@ -25,6 +25,8 @@ struct AppSettingsTests {
         settings.globalShortcut = GlobalShortcut(keyCode: 49, modifiers: 768)
         settings.cursorShape = .underline
         settings.cursorBlink = true
+        settings.ollamaURL = "http://127.0.0.1:11434"
+        settings.ollamaModel = "test-model:3b"
 
         let restored = AppSettings(defaults: defaults)
         #expect(restored.panelHeightRatio == 0.55)
@@ -40,6 +42,8 @@ struct AppSettingsTests {
         #expect(restored.globalShortcut == GlobalShortcut(keyCode: 49, modifiers: 768))
         #expect(restored.cursorShape == .underline)
         #expect(restored.cursorBlink)
+        #expect(restored.ollamaURL == "http://127.0.0.1:11434")
+        #expect(restored.ollamaModel == "test-model:3b")
     }
 
     @Test("Stored numeric values are clamped to supported ranges")

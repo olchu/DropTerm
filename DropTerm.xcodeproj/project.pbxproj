@@ -24,6 +24,7 @@
 		A71C4D111A2B3C4D5E6F7001 /* SnippetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71C4D121A2B3C4D5E6F7002 /* SnippetStore.swift */; };
 		A71C4D131A2B3C4D5E6F7003 /* SnippetSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71C4D141A2B3C4D5E6F7004 /* SnippetSidebarView.swift */; };
 		A71C4D151A2B3C4D5E6F7005 /* SnippetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71C4D161A2B3C4D5E6F7006 /* SnippetStoreTests.swift */; };
+		B82D5A111A2B3C4D5E6F7011 /* OllamaCommandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82D5A121A2B3C4D5E6F7012 /* OllamaCommandService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,6 +55,7 @@
 		A71C4D121A2B3C4D5E6F7002 /* SnippetStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnippetStore.swift; sourceTree = "<group>"; };
 		A71C4D141A2B3C4D5E6F7004 /* SnippetSidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnippetSidebarView.swift; sourceTree = "<group>"; };
 		A71C4D161A2B3C4D5E6F7006 /* SnippetStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnippetStoreTests.swift; sourceTree = "<group>"; };
+		B82D5A121A2B3C4D5E6F7012 /* OllamaCommandService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OllamaCommandService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -140,6 +142,7 @@
 				F91DC7227234A71912F068FE /* AppSettings.swift */,
 				9CC10BF77BB84A3CD5103029 /* DropTermApp.swift */,
 				49082E412BF299462448C064 /* GlobalHotKeyService.swift */,
+				B82D5A121A2B3C4D5E6F7012 /* OllamaCommandService.swift */,
 				4CD1948E679AE1094D0F008A /* SettingsView.swift */,
 				2D1A7F9774BBDBE592830818 /* SettingsWindowController.swift */,
 				A71C4D141A2B3C4D5E6F7004 /* SnippetSidebarView.swift */,
@@ -262,6 +265,7 @@
 				7276CD075E8A25F7A368C5E0 /* AppSettings.swift in Sources */,
 				773716949E9F67BC47E33701 /* DropTermApp.swift in Sources */,
 				48C9A109B8CE4A7B40C11426 /* GlobalHotKeyService.swift in Sources */,
+				B82D5A111A2B3C4D5E6F7011 /* OllamaCommandService.swift in Sources */,
 				ED064759620088528842F546 /* SettingsView.swift in Sources */,
 				C300D11EB67AC4B88F655AF9 /* SettingsWindowController.swift in Sources */,
 				A71C4D131A2B3C4D5E6F7003 /* SnippetSidebarView.swift in Sources */,

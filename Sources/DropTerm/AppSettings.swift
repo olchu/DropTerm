@@ -77,6 +77,14 @@ final class AppSettings {
         didSet { persist(cursorBlink, for: .cursorBlink) }
     }
 
+    var ollamaURL: String {
+        didSet { persist(ollamaURL, for: .ollamaURL) }
+    }
+
+    var ollamaModel: String {
+        didSet { persist(ollamaModel, for: .ollamaModel) }
+    }
+
     @ObservationIgnored
     var onChange: (@MainActor () -> Void)?
 
@@ -139,6 +147,8 @@ final class AppSettings {
             rawValue: defaults.string(forKey: Key.cursorShape.rawValue) ?? ""
         ) ?? .bar
         cursorBlink = defaults.object(forKey: Key.cursorBlink.rawValue) as? Bool ?? false
+        ollamaURL = defaults.string(forKey: Key.ollamaURL.rawValue) ?? "http://localhost:11434"
+        ollamaModel = defaults.string(forKey: Key.ollamaModel.rawValue) ?? "qwen2.5-coder:3b"
     }
 
     private func persist(_ value: Any, for key: Key) {
@@ -171,5 +181,7 @@ final class AppSettings {
         case hotKeyModifiers = "behavior.hotKeyModifiers"
         case cursorShape = "terminal.cursorShape"
         case cursorBlink = "terminal.cursorBlink"
+        case ollamaURL = "ai.ollamaURL"
+        case ollamaModel = "ai.ollamaModel"
     }
 }

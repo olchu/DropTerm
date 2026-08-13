@@ -207,6 +207,7 @@ private final class TerminalTabsView: NSView {
     private let snippetButton = ArrowCursorButton()
     private let snippetStore: SnippetStore
     private let snippetSidebar: SnippetSidebarView
+    private let aiCommandBar = AICommandBarView()
     private var tabs: [Tab] = []
     private var selectedIndex = 0
     private var bottomBackdropHeight: CGFloat = 0
@@ -238,6 +239,14 @@ private final class TerminalTabsView: NSView {
         snippetSidebar.onClose = { [weak self] in
             self?.setSnippetSidebarVisible(false)
         }
+        aiCommandBar.onSubmit = { [weak self] request in
+            self?.generateCommand(from: request)
+        }
+        aiCommandBar.onCancel = { [weak self] in
+            self?.hideAICommandBar()
+        }
+        aiCommandBar.isHidden = true
+        addSubview(aiCommandBar, positioned: .above, relativeTo: snippetSidebar)
         installKeyboardShortcuts()
         installSwipeGesture()
         newTab()
@@ -313,6 +322,8 @@ private final class TerminalTabsView: NSView {
     func terminateSessions() { tabs.forEach { $0.surface.terminateSession() } }
 
     func resetSnippetSidebar() {
+        aiCommandBar.cancelRequest()
+        aiCommandBar.isHidden = true
         guard isSnippetSidebarVisible || isSnippetSidebarPresented else { return }
         sidebarTransitionID += 1
         isSnippetSidebarVisible = false
@@ -369,6 +380,13 @@ private final class TerminalTabsView: NSView {
             y: 0,
             width: sidebarWidth,
             height: bounds.height
+        )
+        let aiWidth = min(620, max(360, bounds.width - 80))
+        aiCommandBar.frame = CGRect(
+            x: (bounds.width - aiWidth) / 2,
+            y: dockSafeY + barHeight + 14,
+            width: aiWidth,
+            height: aiCommandBar.preferredHeight
         )
     }
 
@@ -430,6 +448,9 @@ private final class TerminalTabsView: NSView {
             }
 
             switch (modifiers, key) {
+            case (.command, "v") where !self.aiCommandBar.isHidden:
+                self.aiCommandBar.pasteClipboard()
+                return nil
             case (.command, "t"):
                 self.newTab()
                 return nil
@@ -438,6 +459,9 @@ private final class TerminalTabsView: NSView {
                 return nil
             case ([.command, .shift], "s"):
                 self.toggleSnippetSidebar()
+                return nil
+            case (.command, "k"):
+                self.toggleAICommandBar()
                 return nil
             default:
                 return event
@@ -538,6 +562,66 @@ private final class TerminalTabsView: NSView {
         setSnippetSidebarVisible(!isSnippetSidebarVisible)
     }
 
+    private func toggleAICommandBar() {
+        aiCommandBar.isHidden ? showAICommandBar() : hideAICommandBar()
+    }
+
+    private func showAICommandBar() {
+        aiCommandBar.prepareForInput()
+        aiCommandBar.isHidden = false
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        aiCommandBar.focusInput()
+    }
+
+    private func hideAICommandBar() {
+        aiCommandBar.cancelRequest()
+        aiCommandBar.isHidden = true
+        activeSurface?.focusTerminal()
+    }
+
+    private func generateCommand(from request: String) {
+        guard let surface = activeSurface else { return }
+        let service = OllamaCommandService(
+            baseURL: settings.ollamaURL,
+            model: settings.ollamaModel
+        )
+        let workingDirectory = surface.currentDirectory
+        aiCommandBar.beginLoading()
+        aiCommandBar.requestTask = Task { [weak self, weak surface] in
+            do {
+                async let candidates = ProjectDirectoryIndex.matches(
+                    for: request,
+                    currentDirectory: workingDirectory
+                )
+                async let commandContext = SafeCommandContext.collect(
+                    for: request,
+                    workingDirectory: workingDirectory
+                )
+                let command = try await service.command(
+                    for: request,
+                    workingDirectory: workingDirectory,
+                    projectCandidates: candidates,
+                    commandContext: commandContext
+                )
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self, let surface, surface === self.activeSurface else { return }
+                    surface.insertCommand(command)
+                    self.aiCommandBar.finishLoading()
+                    self.aiCommandBar.isHidden = true
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run { [weak self] in
+                    self?.aiCommandBar.showError(error.localizedDescription)
+                }
+            }
+        }
+    }
+
     private func setSnippetSidebarVisible(_ isVisible: Bool) {
         guard isVisible != isSnippetSidebarVisible else { return }
         isSnippetSidebarVisible = isVisible
@@ -623,6 +707,161 @@ private final class TerminalTabsView: NSView {
     private static func tabColor(for id: UUID) -> NSColor {
         let colors: [NSColor] = [.systemIndigo, .systemGreen, .systemOrange, .systemBlue, .systemPink, .systemPurple, .systemTeal, .systemRed]
         return colors[Int(id.hashValue.magnitude % UInt(colors.count))]
+    }
+}
+
+@MainActor
+private final class AICommandBarView: NSView, NSTextFieldDelegate {
+    var onSubmit: ((String) -> Void)?
+    var onCancel: (() -> Void)?
+    var requestTask: Task<Void, Never>?
+    let preferredHeight: CGFloat = 66
+
+    private let sparkle = NSImageView()
+    private let input = NSTextField()
+    private let submitButton = NSButton()
+    private let spinner = NSProgressIndicator()
+    private let statusLabel = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor(
+            calibratedRed: 0.065,
+            green: 0.052,
+            blue: 0.080,
+            alpha: 0.98
+        ).cgColor
+        layer?.cornerRadius = 14
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.35
+        layer?.shadowRadius = 18
+        layer?.shadowOffset = CGSize(width: 0, height: -4)
+
+        sparkle.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "AI command")
+        sparkle.contentTintColor = .systemPurple
+        addSubview(sparkle)
+
+        input.placeholderString = "Describe a command…"
+        input.font = .systemFont(ofSize: 14)
+        input.isBezeled = false
+        input.drawsBackground = false
+        input.focusRingType = .none
+        input.delegate = self
+        addSubview(input)
+
+        submitButton.title = "Generate"
+        submitButton.bezelStyle = .rounded
+        submitButton.controlSize = .small
+        submitButton.target = self
+        submitButton.action = #selector(submit(_:))
+        addSubview(submitButton)
+
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        addSubview(spinner)
+
+        statusLabel.font = .systemFont(ofSize: 10.5)
+        statusLabel.textColor = .secondaryLabelColor
+        statusLabel.lineBreakMode = .byTruncatingTail
+        addSubview(statusLabel)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func layout() {
+        super.layout()
+        sparkle.frame = CGRect(x: 15, y: 32, width: 18, height: 18)
+        submitButton.sizeToFit()
+        submitButton.frame = CGRect(
+            x: bounds.width - submitButton.frame.width - 14,
+            y: 27,
+            width: submitButton.frame.width,
+            height: 26
+        )
+        spinner.frame = CGRect(x: submitButton.frame.minX - 25, y: 31, width: 16, height: 16)
+        input.frame = CGRect(
+            x: 43,
+            y: 27,
+            width: max(0, spinner.frame.minX - 51),
+            height: 25
+        )
+        statusLabel.frame = CGRect(x: 43, y: 8, width: max(0, bounds.width - 58), height: 14)
+    }
+
+    func prepareForInput() {
+        cancelRequest()
+        input.isEnabled = true
+        submitButton.isEnabled = true
+        statusLabel.stringValue = "Enter to insert  ·  Esc to close  ·  Local Ollama"
+        statusLabel.textColor = .secondaryLabelColor
+    }
+
+    func focusInput() {
+        window?.makeFirstResponder(input)
+    }
+
+    func pasteClipboard() {
+        guard input.isEnabled else { return }
+        if window?.firstResponder !== input.currentEditor() {
+            window?.makeFirstResponder(input)
+        }
+        input.currentEditor()?.paste(nil)
+    }
+
+    func beginLoading() {
+        input.isEnabled = false
+        submitButton.isEnabled = false
+        spinner.startAnimation(nil)
+        statusLabel.stringValue = "Generating command…"
+        statusLabel.textColor = .secondaryLabelColor
+    }
+
+    func finishLoading() {
+        spinner.stopAnimation(nil)
+        requestTask = nil
+        input.stringValue = ""
+    }
+
+    func showError(_ message: String) {
+        spinner.stopAnimation(nil)
+        requestTask = nil
+        input.isEnabled = true
+        submitButton.isEnabled = true
+        statusLabel.stringValue = message
+        statusLabel.textColor = .systemRed
+        focusInput()
+    }
+
+    func cancelRequest() {
+        requestTask?.cancel()
+        requestTask = nil
+        spinner.stopAnimation(nil)
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.insertNewline(_:)) {
+            submit(nil)
+            return true
+        }
+        if selector == #selector(NSResponder.cancelOperation(_:)) {
+            onCancel?()
+            return true
+        }
+        return false
+    }
+
+    @objc private func submit(_ sender: Any?) {
+        let request = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !request.isEmpty, requestTask == nil else {
+            NSSound.beep()
+            return
+        }
+        onSubmit?(request)
     }
 }
 
