@@ -15,6 +15,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
     private var hasStartedSession = false
     private var lastAvailableSize: CGSize = .zero
     private var bottomBackdropHeight: CGFloat = 0
+    private var trailingContentInset: CGFloat = 0
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -52,7 +53,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
         let availableFrame = CGRect(
             x: bounds.minX + padding,
             y: bounds.minY + bottomBackdropHeight + padding,
-            width: max(0, bounds.width - padding * 2),
+            width: max(0, bounds.width - trailingContentInset - padding * 2),
             height: max(0, bounds.height - bottomBackdropHeight - padding * 2)
         )
         guard availableFrame.width > 0, availableFrame.height > 0 else { return }
@@ -92,6 +93,17 @@ final class TerminalSurfaceView: NSVisualEffectView {
         terminalView.selectAll(self)
     }
 
+    func runCommand(_ command: String) {
+        let input = command.hasSuffix("\n") ? command : command + "\n"
+        terminalView.terminal.sendUserInput(Array(input.utf8)[...])
+        focusTerminal()
+    }
+
+    func insertCommand(_ command: String) {
+        terminalView.terminal.sendUserInput(Array(command.utf8)[...])
+        focusTerminal()
+    }
+
     @discardableResult
     func copyLastCommandOutput() -> Bool {
         guard let output = lastCommandOutput(), !output.isEmpty else {
@@ -124,6 +136,14 @@ final class TerminalSurfaceView: NSVisualEffectView {
     func setBottomBackdropHeight(_ height: CGFloat) {
         guard bottomBackdropHeight != height else { return }
         bottomBackdropHeight = max(0, height)
+        lastAvailableSize = .zero
+        needsLayout = true
+    }
+
+    func setTrailingContentInset(_ inset: CGFloat) {
+        let inset = max(0, inset)
+        guard trailingContentInset != inset else { return }
+        trailingContentInset = inset
         lastAvailableSize = .zero
         needsLayout = true
     }
@@ -342,6 +362,10 @@ final class TerminalSurfaceView: NSVisualEffectView {
           # Persist every completed command immediately. DropTerm can close
           # the PTY without giving an interactive shell time to exit cleanly.
           [[ -n "$HISTFILE" ]] && fc -AI "$HISTFILE"
+          # Powerlevel10k owns PROMPT when loaded. Replacing it from a precmd
+          # hook breaks instant prompt; use the compact prompt only for other
+          # zsh configurations.
+          (( ${+functions[p10k]} )) || PROMPT='%3~ '
           printf '\\e]133;D\\a\\e]133;A\\a'
         }
         add-zsh-hook preexec _dropterm_preexec
@@ -391,6 +415,13 @@ final class TerminalSurfaceView: NSVisualEffectView {
             let rcWrapper = """
             [[ -r \(shellQuote(userRC)) ]] && source \(shellQuote(userRC))
             \(integration)
+            if (( ${+functions[p10k]} )); then
+              typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=truncate_to_last
+              typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=3
+              typeset -g POWERLEVEL9K_DIR_MAX_LENGTH=0
+              p10k reload
+              p10k finalize
+            fi
             """
             try rcWrapper.write(
                 to: directory.appendingPathComponent(".zshrc"),
@@ -454,9 +485,9 @@ extension TerminalSurfaceView: @preconcurrency LocalProcessTerminalViewDelegate 
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
 
     func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
-        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedTitle.isEmpty else { return }
-        onTitleChange?(trimmedTitle)
+        // Processes such as npm, Vite, and SSH frequently replace the terminal
+        // title with their command name. Tab titles intentionally follow only
+        // the shell's reported working directory instead.
     }
 
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {

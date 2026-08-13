@@ -155,6 +155,7 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.hidesOnDeactivate = settings.hideOnDeactivate
+        panel.appearance = NSAppearance(named: .darkAqua)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.alphaValue = settings.panelOpacity
@@ -189,16 +190,35 @@ private final class TerminalTabsView: NSView {
     private let tabBar = ArrowCursorView()
     private let tabScrollView = ArrowCursorScrollView()
     private let tabStack = NSStackView()
+    private let addTabButton = ArrowCursorButton()
+    private let snippetButton = ArrowCursorButton()
+    private let snippetStore: SnippetStore
+    private let snippetSidebar: SnippetSidebarView
     private var tabs: [Tab] = []
     private var selectedIndex = 0
     private var bottomBackdropHeight: CGFloat = 0
+    private var isSnippetSidebarVisible = false
     private var keyboardMonitor: Any?
+    private var swipeMonitor: Any?
 
     init(settings: AppSettings) {
         self.settings = settings
+        let snippetStore = SnippetStore()
+        self.snippetStore = snippetStore
+        snippetSidebar = SnippetSidebarView(store: snippetStore)
         super.init(frame: .zero)
         configureTabBar()
+        snippetSidebar.onRunCommand = { [weak self] command in
+            self?.activeSurface?.runCommand(command)
+        }
+        snippetSidebar.onInsertCommand = { [weak self] command in
+            self?.activeSurface?.insertCommand(command)
+        }
+        snippetSidebar.onClose = { [weak self] in
+            self?.setSnippetSidebarVisible(false)
+        }
         installKeyboardShortcuts()
+        installSwipeGesture()
         newTab()
     }
 
@@ -208,7 +228,13 @@ private final class TerminalTabsView: NSView {
         let surface = TerminalSurfaceView(settings: settings)
         let id = UUID()
         surface.onTitleChange = { [weak self] title in self?.updateTitle(title, for: id) }
-        let tab = Tab(id: id, surface: surface, title: "Terminal \(tabs.count + 1)")
+        let startingPath = NSString(string: settings.startingDirectory).expandingTildeInPath
+        let folderName = URL(fileURLWithPath: startingPath).lastPathComponent
+        let tab = Tab(
+            id: id,
+            surface: surface,
+            title: folderName.isEmpty ? "~" : folderName
+        )
         tabs.append(tab)
         addSubview(surface, positioned: .below, relativeTo: tabBar)
         selectTab(at: tabs.count - 1)
@@ -273,8 +299,12 @@ private final class TerminalTabsView: NSView {
 
     override func layout() {
         super.layout()
-        tabs.forEach { $0.surface.frame = bounds }
         let barHeight: CGFloat = 40
+        let sidebarWidth: CGFloat = isSnippetSidebarVisible ? 360 : 0
+        tabs.forEach {
+            $0.surface.frame = bounds
+            $0.surface.setTrailingContentInset(sidebarWidth)
+        }
         // `bottomBackdropHeight` includes PanelLayout.verticalMargin (10 pt).
         // Remove it here so tabs sit just above the actual Dock boundary.
         let dockSafeY = max(5, bottomBackdropHeight - 19)
@@ -284,11 +314,29 @@ private final class TerminalTabsView: NSView {
             width: bounds.width,
             height: barHeight
         )
-        tabScrollView.frame = tabBar.bounds
+        let snippetButtonWidth: CGFloat = 38
+        snippetButton.frame = CGRect(
+            x: tabBar.bounds.width - snippetButtonWidth - 8,
+            y: 4,
+            width: snippetButtonWidth,
+            height: 32
+        )
+        tabScrollView.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: max(0, min(snippetButton.frame.minX - 4, bounds.width - sidebarWidth)),
+            height: tabBar.bounds.height
+        )
         let contentWidth = max(tabScrollView.contentSize.width, tabStack.fittingSize.width)
         tabStack.frame = CGRect(
             origin: .zero,
             size: CGSize(width: contentWidth, height: tabScrollView.contentSize.height)
+        )
+        snippetSidebar.frame = CGRect(
+            x: bounds.width - sidebarWidth,
+            y: 0,
+            width: sidebarWidth,
+            height: bounds.height
         )
     }
 
@@ -311,28 +359,77 @@ private final class TerminalTabsView: NSView {
         tabStack.alignment = .centerY
         tabStack.spacing = 4
         tabStack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        // The scroll view's document view is sized manually in `layout()`.
+        // Prevent AppKit from generating a temporary 0×0 autoresizing constraint
+        // before the first layout pass.
+        tabStack.translatesAutoresizingMaskIntoConstraints = false
         tabScrollView.documentView = tabStack
+
+        addTabButton.title = "+  ⌘T"
+        addTabButton.image = nil
+        addTabButton.isBordered = false
+        addTabButton.font = .systemFont(ofSize: 13, weight: .regular)
+        addTabButton.contentTintColor = .secondaryLabelColor
+        addTabButton.toolTip = "New Tab (⌘T)"
+        addTabButton.target = self
+        addTabButton.action = #selector(addTabClicked(_:))
+
+        snippetButton.image = NSImage(
+            systemSymbolName: "text.badge.plus",
+            accessibilityDescription: "Command Snippets"
+        )
+        snippetButton.isBordered = false
+        snippetButton.contentTintColor = .secondaryLabelColor
+        snippetButton.toolTip = "Command Snippets (⇧⌘S)"
+        snippetButton.target = self
+        snippetButton.action = #selector(toggleSnippets(_:))
+        tabBar.addSubview(snippetButton)
+
+        snippetSidebar.isHidden = true
+        addSubview(snippetSidebar)
     }
 
     private func installKeyboardShortcuts() {
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, event.window === self.window else { return event }
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard modifiers == .command,
-                  let key = event.charactersIgnoringModifiers?.lowercased() else {
+            guard let key = event.charactersIgnoringModifiers?.lowercased() else {
                 return event
             }
 
-            switch key {
-            case "t":
+            switch (modifiers, key) {
+            case (.command, "t"):
                 self.newTab()
                 return nil
-            case "w":
+            case (.command, "w"):
                 self.closeCurrentTab()
+                return nil
+            case ([.command, .shift], "s"):
+                self.toggleSnippetSidebar()
                 return nil
             default:
                 return event
             }
+        }
+    }
+
+    private func installSwipeGesture() {
+        allowedTouchTypes = [.indirect]
+        wantsRestingTouches = true
+        swipeMonitor = NSEvent.addLocalMonitorForEvents(matching: .swipe) { [weak self] event in
+            guard let self, event.window === self.window else { return event }
+            let touchCount = event.touches(matching: .touching, in: self).count
+            guard touchCount == 3 else { return event }
+
+            if event.deltaX < 0, !self.isSnippetSidebarVisible {
+                self.setSnippetSidebarVisible(true)
+                return nil
+            }
+            if event.deltaX > 0, self.isSnippetSidebarVisible {
+                self.setSnippetSidebarVisible(false)
+                return nil
+            }
+            return event
         }
     }
 
@@ -343,8 +440,10 @@ private final class TerminalTabsView: NSView {
 
     private func rebuildTabBar() {
         tabStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for (index, tab) in tabs.enumerated() {
-            if index > 0 {
+        let visibleTabs = Array(tabs.enumerated())
+        for (visibleIndex, entry) in visibleTabs.enumerated() {
+            let (index, tab) = entry
+            if visibleIndex > 0 {
                 tabStack.addArrangedSubview(TabSeparatorView())
             }
             let item = AnimatedTabItem(
@@ -359,27 +458,31 @@ private final class TerminalTabsView: NSView {
             item.toolTip = "Tab \(index + 1)"
             tabStack.addArrangedSubview(item)
         }
-        let addSpacer = NSView(frame: NSRect(x: 0, y: 0, width: 10, height: 1))
-        addSpacer.widthAnchor.constraint(equalToConstant: 10).isActive = true
-        tabStack.addArrangedSubview(addSpacer)
-
-        let addButton = ArrowCursorButton(
-            title: "+  ⌘T",
-            target: self,
-            action: #selector(addTabClicked(_:))
-        )
-        addButton.isBordered = false
-        addButton.font = .systemFont(ofSize: 13, weight: .regular)
-        addButton.contentTintColor = .tertiaryLabelColor
-        addButton.toolTip = "New Tab (⌘T)"
-        tabStack.addArrangedSubview(addButton)
+        if !visibleTabs.isEmpty {
+            tabStack.addArrangedSubview(TabSeparatorView())
+        }
+        tabStack.addArrangedSubview(addTabButton)
         needsLayout = true
-        layoutSubtreeIfNeeded()
-        scrollSelectedTabToVisible()
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollSelectedTabToVisible()
+        }
     }
 
     @objc private func tabClicked(_ sender: NSButton) { selectTab(at: sender.tag) }
     @objc private func addTabClicked(_ sender: Any?) { newTab() }
+    @objc private func toggleSnippets(_ sender: Any?) { toggleSnippetSidebar() }
+
+    private func toggleSnippetSidebar() {
+        setSnippetSidebarVisible(!isSnippetSidebarVisible)
+    }
+
+    private func setSnippetSidebarVisible(_ isVisible: Bool) {
+        isSnippetSidebarVisible = isVisible
+        snippetSidebar.isHidden = !isVisible
+        snippetButton.contentTintColor = isVisible ? .controlAccentColor : .secondaryLabelColor
+        needsLayout = true
+        if !isVisible { activeSurface?.focusTerminal() }
+    }
 
     private func updateTitle(_ title: String, for id: UUID) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }

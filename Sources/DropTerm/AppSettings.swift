@@ -19,7 +19,7 @@ final class AppSettings {
         }
     }
 
-    static let shared = AppSettings(defaults: persistentDefaults())
+    static let shared = AppSettings()
 
     var panelHeightRatio: Double {
         didSet { persist(panelHeightRatio, for: .panelHeightRatio) }
@@ -139,20 +139,6 @@ final class AppSettings {
             rawValue: defaults.string(forKey: Key.cursorShape.rawValue) ?? ""
         ) ?? .bar
         cursorBlink = defaults.object(forKey: Key.cursorBlink.rawValue) as? Bool ?? false
-    }
-
-    private static func persistentDefaults() -> UserDefaults {
-        guard let defaults = UserDefaults(suiteName: "com.olchu.DropTerm") else {
-            return .standard
-        }
-
-        let legacyDefaults = UserDefaults.standard
-        for key in Key.allCases where defaults.object(forKey: key.rawValue) == nil {
-            if let value = legacyDefaults.object(forKey: key.rawValue) {
-                defaults.set(value, forKey: key.rawValue)
-            }
-        }
-        return defaults
     }
 
     private func persist(_ value: Any, for key: Key) {

@@ -21,6 +21,9 @@
 		C300D11EB67AC4B88F655AF9 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D1A7F9774BBDBE592830818 /* SettingsWindowController.swift */; };
 		E1F301C29E0B195D9FE03F9E /* TerminalPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5997009E02DE5C0C177F9C7 /* TerminalPanelController.swift */; };
 		ED064759620088528842F546 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CD1948E679AE1094D0F008A /* SettingsView.swift */; };
+		A71C4D111A2B3C4D5E6F7001 /* SnippetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71C4D121A2B3C4D5E6F7002 /* SnippetStore.swift */; };
+		A71C4D131A2B3C4D5E6F7003 /* SnippetSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71C4D141A2B3C4D5E6F7004 /* SnippetSidebarView.swift */; };
+		A71C4D151A2B3C4D5E6F7005 /* SnippetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71C4D161A2B3C4D5E6F7006 /* SnippetStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +51,9 @@
 		D56BDC483E872FB0F2CF2D95 /* AppSettingsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSettingsTests.swift; sourceTree = "<group>"; };
 		E5997009E02DE5C0C177F9C7 /* TerminalPanelController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalPanelController.swift; sourceTree = "<group>"; };
 		F91DC7227234A71912F068FE /* AppSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		A71C4D121A2B3C4D5E6F7002 /* SnippetStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnippetStore.swift; sourceTree = "<group>"; };
+		A71C4D141A2B3C4D5E6F7004 /* SnippetSidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnippetSidebarView.swift; sourceTree = "<group>"; };
+		A71C4D161A2B3C4D5E6F7006 /* SnippetStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnippetStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +101,7 @@
 			children = (
 				D56BDC483E872FB0F2CF2D95 /* AppSettingsTests.swift */,
 				C3447D17E66B4D5565A51C4E /* PanelLayoutTests.swift */,
+				A71C4D161A2B3C4D5E6F7006 /* SnippetStoreTests.swift */,
 			);
 			name = DropTermTests;
 			path = Tests/DropTermTests;
@@ -135,6 +142,8 @@
 				49082E412BF299462448C064 /* GlobalHotKeyService.swift */,
 				4CD1948E679AE1094D0F008A /* SettingsView.swift */,
 				2D1A7F9774BBDBE592830818 /* SettingsWindowController.swift */,
+				A71C4D141A2B3C4D5E6F7004 /* SnippetSidebarView.swift */,
+				A71C4D121A2B3C4D5E6F7002 /* SnippetStore.swift */,
 				E5997009E02DE5C0C177F9C7 /* TerminalPanelController.swift */,
 				0A131FBFA753950FD6A4EB5B /* TerminalSurfaceView.swift */,
 			);
@@ -241,6 +250,7 @@
 			files = (
 				8ADBF5EE3E67B98C8DB23CCF /* AppSettingsTests.swift in Sources */,
 				57AF67695801214DEE120D28 /* PanelLayoutTests.swift in Sources */,
+				A71C4D151A2B3C4D5E6F7005 /* SnippetStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -254,6 +264,8 @@
 				48C9A109B8CE4A7B40C11426 /* GlobalHotKeyService.swift in Sources */,
 				ED064759620088528842F546 /* SettingsView.swift in Sources */,
 				C300D11EB67AC4B88F655AF9 /* SettingsWindowController.swift in Sources */,
+				A71C4D131A2B3C4D5E6F7003 /* SnippetSidebarView.swift in Sources */,
+				A71C4D111A2B3C4D5E6F7001 /* SnippetStore.swift in Sources */,
 				E1F301C29E0B195D9FE03F9E /* TerminalPanelController.swift in Sources */,
 				AF81BBA5B85D64A1ED3DCF18 /* TerminalSurfaceView.swift in Sources */,
 			);
@@ -275,7 +287,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = 6PEVX4KK6Z;
@@ -375,7 +386,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = 6PEVX4KK6Z;
