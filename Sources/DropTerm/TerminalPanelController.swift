@@ -198,8 +198,12 @@ private final class TerminalTabsView: NSView {
     private var selectedIndex = 0
     private var bottomBackdropHeight: CGFloat = 0
     private var isSnippetSidebarVisible = false
+    private var isSnippetSidebarPresented = false
+    private var sidebarTransitionID = 0
     private var keyboardMonitor: Any?
     private var swipeMonitor: Any?
+    private var swipeTranslation = CGPoint.zero
+    private var didTriggerSwipe = false
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -300,10 +304,10 @@ private final class TerminalTabsView: NSView {
     override func layout() {
         super.layout()
         let barHeight: CGFloat = 40
-        let sidebarWidth: CGFloat = isSnippetSidebarVisible ? 360 : 0
+        let sidebarWidth: CGFloat = isSnippetSidebarPresented ? 360 : 0
         tabs.forEach {
             $0.surface.frame = bounds
-            $0.surface.setTrailingContentInset(sidebarWidth)
+            $0.surface.setTrailingContentInset(0)
         }
         // `bottomBackdropHeight` includes PanelLayout.verticalMargin (10 pt).
         // Remove it here so tabs sit just above the actual Dock boundary.
@@ -324,7 +328,7 @@ private final class TerminalTabsView: NSView {
         tabScrollView.frame = CGRect(
             x: 0,
             y: 0,
-            width: max(0, min(snippetButton.frame.minX - 4, bounds.width - sidebarWidth)),
+            width: max(0, snippetButton.frame.minX - 4),
             height: tabBar.bounds.height
         )
         let contentWidth = max(tabScrollView.contentSize.width, tabStack.fittingSize.width)
@@ -414,18 +418,48 @@ private final class TerminalTabsView: NSView {
     }
 
     private func installSwipeGesture() {
-        allowedTouchTypes = [.indirect]
-        wantsRestingTouches = true
-        swipeMonitor = NSEvent.addLocalMonitorForEvents(matching: .swipe) { [weak self] event in
+        swipeMonitor = NSEvent.addLocalMonitorForEvents(matching: [.swipe, .scrollWheel]) { [weak self] event in
             guard let self, event.window === self.window else { return event }
-            let touchCount = event.touches(matching: .touching, in: self).count
-            guard touchCount == 3 else { return event }
 
-            if event.deltaX < 0, !self.isSnippetSidebarVisible {
+            if event.type == .swipe {
+                if event.deltaX < 0, !self.isSnippetSidebarVisible {
+                    self.setSnippetSidebarVisible(true)
+                    return nil
+                }
+                if event.deltaX > 0, self.isSnippetSidebarVisible {
+                    self.setSnippetSidebarVisible(false)
+                    return nil
+                }
+                return event
+            }
+
+            guard event.hasPreciseScrollingDeltas, event.momentumPhase.isEmpty else { return event }
+
+            if event.phase == .mayBegin || event.phase == .began {
+                self.swipeTranslation = .zero
+                self.didTriggerSwipe = false
+            }
+
+            guard !self.didTriggerSwipe else { return nil }
+            self.swipeTranslation.x += event.scrollingDeltaX
+            self.swipeTranslation.y += event.scrollingDeltaY
+
+            let horizontalDistance = abs(self.swipeTranslation.x)
+            guard horizontalDistance >= 42,
+                  horizontalDistance > abs(self.swipeTranslation.y) else {
+                if event.phase == .ended || event.phase == .cancelled {
+                    self.swipeTranslation = .zero
+                }
+                return event
+            }
+
+            if self.swipeTranslation.x < 0, !self.isSnippetSidebarVisible {
+                self.didTriggerSwipe = true
                 self.setSnippetSidebarVisible(true)
                 return nil
             }
-            if event.deltaX > 0, self.isSnippetSidebarVisible {
+            if self.swipeTranslation.x > 0, self.isSnippetSidebarVisible {
+                self.didTriggerSwipe = true
                 self.setSnippetSidebarVisible(false)
                 return nil
             }
@@ -477,11 +511,71 @@ private final class TerminalTabsView: NSView {
     }
 
     private func setSnippetSidebarVisible(_ isVisible: Bool) {
+        guard isVisible != isSnippetSidebarVisible else { return }
         isSnippetSidebarVisible = isVisible
-        snippetSidebar.isHidden = !isVisible
+        sidebarTransitionID += 1
+        let transitionID = sidebarTransitionID
         snippetButton.contentTintColor = isVisible ? .controlAccentColor : .secondaryLabelColor
-        needsLayout = true
-        if !isVisible { activeSurface?.focusTerminal() }
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            isSnippetSidebarPresented = isVisible
+            snippetSidebar.isHidden = !isVisible
+            snippetSidebar.layer?.removeAllAnimations()
+            needsLayout = true
+            if !isVisible { activeSurface?.focusTerminal() }
+            return
+        }
+
+        if isVisible {
+            isSnippetSidebarPresented = true
+            snippetSidebar.isHidden = false
+            needsLayout = true
+            layoutSubtreeIfNeeded()
+            animateSnippetSidebar(from: 360, to: 0, transitionID: transitionID)
+        } else {
+            animateSnippetSidebar(from: 0, to: 360, transitionID: transitionID) { [weak self] in
+                guard let self,
+                      self.sidebarTransitionID == transitionID,
+                      !self.isSnippetSidebarVisible else { return }
+                self.isSnippetSidebarPresented = false
+                self.snippetSidebar.isHidden = true
+                self.snippetSidebar.layer?.removeAnimation(forKey: "snippet-sidebar-slide")
+                self.needsLayout = true
+                self.activeSurface?.focusTerminal()
+            }
+        }
+    }
+
+    private func animateSnippetSidebar(
+        from startX: CGFloat,
+        to endX: CGFloat,
+        transitionID: Int,
+        completion: (() -> Void)? = nil
+    ) {
+        guard let layer = snippetSidebar.layer else {
+            completion?()
+            return
+        }
+        layer.removeAnimation(forKey: "snippet-sidebar-slide")
+
+        let animation = CASpringAnimation(keyPath: "transform.translation.x")
+        animation.fromValue = startX
+        animation.toValue = endX
+        animation.mass = 1
+        animation.stiffness = 250
+        animation.damping = 22
+        animation.initialVelocity = 0.35
+        animation.duration = min(0.52, animation.settlingDuration)
+        animation.fillMode = .forwards
+        animation.isRemovedOnCompletion = false
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            guard self?.sidebarTransitionID == transitionID else { return }
+            completion?()
+        }
+        layer.add(animation, forKey: "snippet-sidebar-slide")
+        CATransaction.commit()
     }
 
     private func updateTitle(_ title: String, for id: UUID) {

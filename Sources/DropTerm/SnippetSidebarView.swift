@@ -71,6 +71,7 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
     }
 
     private func configureAppearance() {
+        wantsLayer = true
         for separator in [verticalSeparator, headerSeparator] {
             separator.wantsLayer = true
             separator.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.09).cgColor
