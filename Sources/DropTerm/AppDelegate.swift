@@ -108,16 +108,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let editMenu = NSMenu(title: "Edit")
         let copyItem = editMenu.addItem(
             withTitle: "Copy",
-            action: #selector(copySelection),
+            action: #selector(NSText.copy(_:)),
             keyEquivalent: "c"
         )
-        copyItem.target = self
+        copyItem.target = nil
         let pasteItem = editMenu.addItem(
             withTitle: "Paste",
-            action: #selector(pasteClipboard),
+            action: #selector(NSText.paste(_:)),
             keyEquivalent: "v"
         )
-        pasteItem.target = self
+        pasteItem.target = nil
         let copyOutputItem = editMenu.addItem(
             withTitle: "Copy Last Command Output",
             action: #selector(copyLastCommandOutput),
@@ -128,10 +128,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(.separator())
         let selectAllItem = editMenu.addItem(
             withTitle: "Select All",
-            action: #selector(selectAllText),
+            action: #selector(NSText.selectAll(_:)),
             keyEquivalent: "a"
         )
-        selectAllItem.target = self
+        selectAllItem.target = nil
         editItem.submenu = editMenu
         mainMenu.addItem(editItem)
 

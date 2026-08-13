@@ -8,6 +8,7 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
     private lazy var panel = makePanel()
     private var isVisible = false
     private var appliedStartingDirectory: String
+    private var inputSourceBeforeShowing: TISInputSource?
 
     init(settings: AppSettings = .shared) {
         self.settings = settings
@@ -25,6 +26,10 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
 
     func show() {
         guard let screen = screenUnderPointer() ?? NSScreen.main else { return }
+
+        if !isVisible {
+            inputSourceBeforeShowing = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        }
 
         let frames = layout.frames(screenFrame: screen.frame, visibleFrame: screen.visibleFrame)
         terminalTabs.setBottomBackdropHeight(layout.bottomBackdropHeight(for: screen))
@@ -72,6 +77,8 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
     func hide() {
         guard let screen = panel.screen ?? NSScreen.main else { return }
         let hiddenFrame = layout.frames(screenFrame: screen.frame, visibleFrame: screen.visibleFrame).hidden
+        terminalTabs.resetSnippetSidebar()
+        restorePreviousInputSource()
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.18
@@ -176,6 +183,12 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         else { return }
         TISSelectInputSource(inputSource)
     }
+
+    private func restorePreviousInputSource() {
+        guard let inputSourceBeforeShowing else { return }
+        TISSelectInputSource(inputSourceBeforeShowing)
+        self.inputSourceBeforeShowing = nil
+    }
 }
 
 @MainActor
@@ -211,6 +224,10 @@ private final class TerminalTabsView: NSView {
         self.snippetStore = snippetStore
         snippetSidebar = SnippetSidebarView(store: snippetStore)
         super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 18
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
         configureTabBar()
         snippetSidebar.onRunCommand = { [weak self] command in
             self?.activeSurface?.runCommand(command)
@@ -294,6 +311,17 @@ private final class TerminalTabsView: NSView {
     func applyStartingDirectory() { activeSurface?.applyStartingDirectory() }
     func applySettings() { tabs.forEach { $0.surface.applySettings() } }
     func terminateSessions() { tabs.forEach { $0.surface.terminateSession() } }
+
+    func resetSnippetSidebar() {
+        guard isSnippetSidebarVisible || isSnippetSidebarPresented else { return }
+        sidebarTransitionID += 1
+        isSnippetSidebarVisible = false
+        isSnippetSidebarPresented = false
+        snippetSidebar.layer?.removeAnimation(forKey: "snippet-sidebar-slide")
+        snippetSidebar.isHidden = true
+        snippetButton.contentTintColor = .secondaryLabelColor
+        needsLayout = true
+    }
 
     func setBottomBackdropHeight(_ height: CGFloat) {
         bottomBackdropHeight = max(0, height)

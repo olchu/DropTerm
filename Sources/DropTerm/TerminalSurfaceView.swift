@@ -363,7 +363,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
             .appendingPathComponent("com.olchu.DropTerm", isDirectory: true)
         let home = FileManager.default.homeDirectoryForCurrentUser
         let integration = """
-        autoload -Uz add-zsh-hook
+        autoload -Uz add-zsh-hook add-zle-hook-widget
         _dropterm_preexec() { printf '\\e]133;C\\a' }
         _dropterm_precmd() {
           # Persist every completed command immediately. DropTerm can close
@@ -373,10 +373,12 @@ final class TerminalSurfaceView: NSVisualEffectView {
           # hook breaks instant prompt; use the compact prompt only for other
           # zsh configurations.
           (( ${+functions[p10k]} )) || PROMPT='%3~ '
-          printf '\\e]133;D\\a\\e]133;A\\a'
+          printf '\\e]133;D\\a\\e]133;A;cl=w\\a'
         }
+        _dropterm_line_init() { printf '\\e]133;B\\a' }
         add-zsh-hook preexec _dropterm_preexec
         add-zsh-hook precmd _dropterm_precmd
+        add-zle-hook-widget line-init _dropterm_line_init
 
         # Prefix-aware history navigation. Oh My Zsh ships this plugin, but it
         # is not enabled in every user configuration. Load it only for
@@ -511,6 +513,52 @@ extension TerminalSurfaceView: @preconcurrency LocalProcessTerminalViewDelegate 
 
 private final class OutputObservingTerminalView: LocalProcessTerminalView {
     var onDataReceived: (() -> Void)?
+    private var isDraggingPointer = false
+
+    override func mouseDown(with event: NSEvent) {
+        isDraggingPointer = false
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        isDraggingPointer = true
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        let shouldMoveCursor = event.clickCount == 1
+            && !isDraggingPointer
+            && event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+        let target = shouldMoveCursor ? terminalPosition(for: event) : nil
+
+        // SwiftTerm normally waits for the full system double-click interval
+        // before routing a semantic prompt click. Disable that deferred route
+        // for this event and perform the same movement immediately below.
+        let clickBehavior = terminal.semanticPromptClickBehavior
+        terminal.semanticPromptClickBehavior = .disabled
+        super.mouseUp(with: event)
+        terminal.semanticPromptClickBehavior = clickBehavior
+
+        if let target {
+            _ = terminal.handleSemanticPromptClick(at: target)
+            setNeedsDisplay(bounds)
+        }
+        isDraggingPointer = false
+    }
+
+    private func terminalPosition(for event: NSEvent) -> Position? {
+        guard terminal.cols > 0, terminal.rows > 0,
+              bounds.width > 0, bounds.height > 0 else { return nil }
+        let point = convert(event.locationInWindow, from: nil)
+        let cellWidth = bounds.width / CGFloat(terminal.cols)
+        let cellHeight = bounds.height / CGFloat(terminal.rows)
+        let column = min(max(Int(point.x / cellWidth), 0), terminal.cols - 1)
+        let visibleRow = min(
+            max(Int((bounds.height - point.y) / cellHeight), 0),
+            terminal.rows - 1
+        )
+        return Position(col: column, row: visibleRow + terminal.buffer.yDisp)
+    }
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
         super.dataReceived(slice: slice)

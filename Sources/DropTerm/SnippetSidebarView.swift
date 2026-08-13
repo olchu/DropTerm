@@ -16,7 +16,6 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
     private let closeButton = SidebarIconButton()
     private let scrollView = SidebarScrollView()
     private let stack = FlippedStackView()
-    private let verticalSeparator = NSView()
     private let headerSeparator = NSView()
     private var collapsedGroupIDs: Set<UUID> = []
     private var contentWidthConstraints: [NSLayoutConstraint] = []
@@ -40,13 +39,23 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
 
     required init?(coder: NSCoder) { nil }
 
+    override func resetCursorRects() {
+        discardCursorRects()
+        addCursorRect(bounds, cursor: .arrow)
+        super.resetCursorRects()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        NSCursor.arrow.set()
+        super.mouseMoved(with: event)
+    }
+
     override func layout() {
         super.layout()
         let padding: CGFloat = 16
         let headerHeight: CGFloat = 86
         let contentWidth = max(0, bounds.width - padding * 2 - 1)
 
-        verticalSeparator.frame = CGRect(x: 0, y: 18, width: 1, height: max(0, bounds.height - 36))
         titleLabel.frame = CGRect(x: padding + 1, y: bounds.height - 37, width: 150, height: 20)
         closeButton.frame = CGRect(x: bounds.width - 40, y: bounds.height - 41, width: 26, height: 26)
         addGroupButton.frame = CGRect(x: closeButton.frame.minX - 29, y: bounds.height - 41, width: 26, height: 26)
@@ -72,11 +81,15 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
 
     private func configureAppearance() {
         wantsLayer = true
-        for separator in [verticalSeparator, headerSeparator] {
-            separator.wantsLayer = true
-            separator.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.09).cgColor
-            addSubview(separator)
-        }
+        layer?.backgroundColor = NSColor(
+            calibratedRed: 0.055,
+            green: 0.045,
+            blue: 0.070,
+            alpha: 0.97
+        ).cgColor
+        headerSeparator.wantsLayer = true
+        headerSeparator.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.09).cgColor
+        addSubview(headerSeparator)
     }
 
     private func configureHeader() {
