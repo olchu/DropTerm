@@ -94,14 +94,21 @@ final class TerminalSurfaceView: NSVisualEffectView {
     }
 
     func runCommand(_ command: String) {
-        let input = command.hasSuffix("\n") ? command : command + "\n"
+        let input = Self.snippetShellInput(command) + "\n"
         terminalView.terminal.sendUserInput(Array(input.utf8)[...])
         focusTerminal()
     }
 
     func insertCommand(_ command: String) {
-        terminalView.terminal.sendUserInput(Array(command.utf8)[...])
+        terminalView.terminal.sendUserInput(Array(Self.snippetShellInput(command).utf8)[...])
         focusTerminal()
+    }
+
+    private static func snippetShellInput(_ value: String) -> String {
+        value.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " && ")
     }
 
     @discardableResult

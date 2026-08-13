@@ -23,8 +23,10 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
     private var activeEditor: Editor?
 
     private enum Editor: Equatable {
-        case group
-        case snippet(UUID)
+        case addGroup
+        case addSnippet(UUID)
+        case editGroup(UUID)
+        case editSnippet(groupID: UUID, snippetID: UUID)
     }
 
     init(store: SnippetStore) {
@@ -146,8 +148,8 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
         contentWidthConstraints.removeAll()
         let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if activeEditor == .group {
-            addInlineEditor(mode: .group)
+        if activeEditor == .addGroup {
+            addInlineEditor(mode: .addGroup)
         }
 
         for group in store.groups {
@@ -166,6 +168,7 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
                 isCollapsed: isCollapsed,
                 onToggle: { [weak self] in self?.toggleGroup(group.id) },
                 onAdd: { [weak self] in self?.addSnippet(to: group.id) },
+                onEdit: { [weak self] in self?.editGroup(group.id) },
                 onDelete: { [weak self] in
                     self?.store.removeGroup(id: group.id)
                     self?.rebuild()
@@ -173,8 +176,11 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
             )
             addContentView(header)
 
-            if activeEditor == .snippet(group.id) {
-                addInlineEditor(mode: .snippet(group.id))
+            if activeEditor == .editGroup(group.id) {
+                addInlineEditor(mode: .editGroup(group))
+            }
+            if activeEditor == .addSnippet(group.id) {
+                addInlineEditor(mode: .addSnippet(group.id))
             }
 
             guard !isCollapsed else { continue }
@@ -183,12 +189,16 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
                     snippet: snippet,
                     onInsert: { [weak self] in self?.onInsertCommand?(snippet.command) },
                     onRun: { [weak self] in self?.onRunCommand?(snippet.command) },
+                    onEdit: { [weak self] in self?.editSnippet(snippet.id, in: group.id) },
                     onDelete: { [weak self] in
                         self?.store.removeSnippet(id: snippet.id, from: group.id)
                         self?.rebuild()
                     }
                 )
                 addContentView(row)
+                if activeEditor == .editSnippet(groupID: group.id, snippetID: snippet.id) {
+                    addInlineEditor(mode: .editSnippet(groupID: group.id, snippet: snippet))
+                }
             }
         }
 
@@ -213,17 +223,25 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
         contentWidthConstraints.append(constraint)
     }
 
-    private func addInlineEditor(mode: Editor) {
-        let editorMode: InlineSnippetEditor.Mode = mode == .group ? .group : .snippet
-        let editor = InlineSnippetEditor(mode: editorMode) { [weak self] name, command in
+    private func addInlineEditor(mode: EditorPresentation) {
+        let editor = InlineSnippetEditor(
+            mode: mode.isGroup ? .group : .snippet,
+            initialName: mode.name,
+            initialCommands: mode.commands
+        ) { [weak self] name, command in
             guard let self else { return }
             switch mode {
-            case .group:
+            case .addGroup:
                 self.store.addGroup(named: name)
-            case .snippet(let groupID):
+            case .addSnippet(let groupID):
                 guard let command else { return }
                 self.store.addSnippet(name: name, command: command, to: groupID)
                 self.collapsedGroupIDs.remove(groupID)
+            case .editGroup(let group):
+                self.store.renameGroup(id: group.id, to: name)
+            case .editSnippet(let groupID, let snippet):
+                guard let command else { return }
+                self.store.updateSnippet(id: snippet.id, in: groupID, name: name, command: command)
             }
             self.activeEditor = nil
             self.rebuild()
@@ -258,15 +276,55 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
     @objc private func closeClicked(_ sender: Any?) { onClose?() }
 
     private func addGroup() {
-        activeEditor = activeEditor == .group ? nil : .group
+        activeEditor = activeEditor == .addGroup ? nil : .addGroup
         rebuild()
     }
 
     private func addSnippet(to groupID: UUID) {
-        let editor = Editor.snippet(groupID)
+        let editor = Editor.addSnippet(groupID)
         activeEditor = activeEditor == editor ? nil : editor
         collapsedGroupIDs.remove(groupID)
         rebuild()
+    }
+
+    private func editGroup(_ groupID: UUID) {
+        let editor = Editor.editGroup(groupID)
+        activeEditor = activeEditor == editor ? nil : editor
+        rebuild()
+    }
+
+    private func editSnippet(_ snippetID: UUID, in groupID: UUID) {
+        let editor = Editor.editSnippet(groupID: groupID, snippetID: snippetID)
+        activeEditor = activeEditor == editor ? nil : editor
+        collapsedGroupIDs.remove(groupID)
+        rebuild()
+    }
+}
+
+private enum EditorPresentation {
+    case addGroup
+    case addSnippet(UUID)
+    case editGroup(SnippetGroup)
+    case editSnippet(groupID: UUID, snippet: CommandSnippet)
+
+    var isGroup: Bool {
+        switch self {
+        case .addGroup, .editGroup: true
+        case .addSnippet, .editSnippet: false
+        }
+    }
+
+    var name: String {
+        switch self {
+        case .editGroup(let group): group.name
+        case .editSnippet(_, let snippet): snippet.name
+        default: ""
+        }
+    }
+
+    var commands: [String] {
+        guard case .editSnippet(_, let snippet) = self else { return [] }
+        return snippet.command.components(separatedBy: .newlines).filter { !$0.isEmpty }
     }
 }
 
@@ -275,15 +333,20 @@ private final class InlineSnippetEditor: NSView, NSTextFieldDelegate {
     enum Mode: Equatable { case group, snippet }
 
     let firstField = NSTextField()
-    private let commandField = NSTextField()
+    private var commandFields: [NSTextField] = []
+    private let addCommandButton = NSButton()
     private let saveButton = SidebarIconButton()
     private let cancelButton = SidebarIconButton()
     private let mode: Mode
     private let onSave: (String, String?) -> Void
     private let onCancel: () -> Void
+    private var editorHeightConstraint: NSLayoutConstraint?
+    private var commandActionTargets: [ButtonClosureTarget] = []
 
     init(
         mode: Mode,
+        initialName: String = "",
+        initialCommands: [String] = [],
         onSave: @escaping (String, String?) -> Void,
         onCancel: @escaping () -> Void
     ) {
@@ -297,11 +360,19 @@ private final class InlineSnippetEditor: NSView, NSTextFieldDelegate {
         layer?.cornerCurve = .continuous
 
         configure(firstField, placeholder: mode == .group ? "Group name" : "Snippet name")
+        firstField.stringValue = initialName
         addSubview(firstField)
         if mode == .snippet {
-            configure(commandField, placeholder: "Command")
-            commandField.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
-            addSubview(commandField)
+            for command in initialCommands.isEmpty ? [""] : initialCommands {
+                addCommandField(value: command)
+            }
+            addCommandButton.title = "+ Add command"
+            addCommandButton.isBordered = false
+            addCommandButton.font = .systemFont(ofSize: 11.5)
+            addCommandButton.contentTintColor = .secondaryLabelColor
+            addCommandButton.target = self
+            addCommandButton.action = #selector(addCommandClicked(_:))
+            addSubview(addCommandButton)
         }
 
         saveButton.configure(symbol: "checkmark", toolTip: "Save", target: self, action: #selector(saveClicked(_:)))
@@ -309,7 +380,9 @@ private final class InlineSnippetEditor: NSView, NSTextFieldDelegate {
         addSubview(saveButton)
         cancelButton.configure(symbol: "xmark", toolTip: "Cancel", target: self, action: #selector(cancelClicked(_:)))
         addSubview(cancelButton)
-        heightAnchor.constraint(equalToConstant: mode == .group ? 38 : 62).isActive = true
+        let heightConstraint = heightAnchor.constraint(equalToConstant: preferredHeight)
+        heightConstraint.isActive = true
+        editorHeightConstraint = heightConstraint
     }
 
     required init?(coder: NSCoder) { nil }
@@ -320,10 +393,15 @@ private final class InlineSnippetEditor: NSView, NSTextFieldDelegate {
         if mode == .group {
             firstField.frame = CGRect(x: 10, y: 7, width: fieldWidth, height: 24)
         } else {
-            firstField.frame = CGRect(x: 10, y: 33, width: fieldWidth, height: 22)
-            commandField.frame = CGRect(x: 10, y: 7, width: fieldWidth, height: 22)
+            firstField.frame = CGRect(x: 10, y: bounds.height - 31, width: fieldWidth, height: 22)
+            for (index, field) in commandFields.enumerated() {
+                let y = bounds.height - 59 - CGFloat(index * 28)
+                field.frame = CGRect(x: 16, y: y, width: max(0, bounds.width - 108), height: 22)
+                layoutCommandActions(at: index, y: y)
+            }
+            addCommandButton.frame = CGRect(x: 10, y: 7, width: 100, height: 22)
         }
-        cancelButton.frame = CGRect(x: bounds.width - 27, y: (bounds.height - 24) / 2, width: 22, height: 24)
+        cancelButton.frame = CGRect(x: bounds.width - 27, y: bounds.height - 32, width: 22, height: 24)
         saveButton.frame = CGRect(x: cancelButton.frame.minX - 25, y: cancelButton.frame.minY, width: 22, height: 24)
     }
 
@@ -334,7 +412,13 @@ private final class InlineSnippetEditor: NSView, NSTextFieldDelegate {
         }
         if selector == #selector(NSResponder.insertNewline(_:)) {
             if mode == .snippet, control === firstField {
-                window?.makeFirstResponder(commandField)
+                window?.makeFirstResponder(commandFields.first)
+            } else if let index = commandFields.firstIndex(where: { $0 === control }) {
+                if commandFields.indices.contains(index + 1) {
+                    window?.makeFirstResponder(commandFields[index + 1])
+                } else {
+                    addCommandField(focusing: true)
+                }
             } else {
                 save()
             }
@@ -354,6 +438,7 @@ private final class InlineSnippetEditor: NSView, NSTextFieldDelegate {
 
     @objc private func saveClicked(_ sender: Any?) { save() }
     @objc private func cancelClicked(_ sender: Any?) { onCancel() }
+    @objc private func addCommandClicked(_ sender: Any?) { addCommandField(focusing: true) }
 
     private func save() {
         let name = firstField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -366,13 +451,87 @@ private final class InlineSnippetEditor: NSView, NSTextFieldDelegate {
             onSave(name, nil)
             return
         }
-        let command = commandField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !command.isEmpty else {
+        let commands = commandFields
+            .map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !commands.isEmpty else {
             NSSound.beep()
-            window?.makeFirstResponder(commandField)
+            window?.makeFirstResponder(commandFields.first)
             return
         }
-        onSave(name, command)
+        onSave(name, commands.joined(separator: "\n"))
+    }
+
+    private var preferredHeight: CGFloat {
+        mode == .group ? 38 : 70 + CGFloat(commandFields.count * 28)
+    }
+
+    private func addCommandField(value: String = "", focusing: Bool = false) {
+        let field = NSTextField()
+        configure(field, placeholder: "Command \(commandFields.count + 1)")
+        field.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        field.stringValue = value
+        commandFields.append(field)
+        addSubview(field)
+        rebuildCommandActions()
+        editorHeightConstraint?.constant = preferredHeight
+        needsLayout = true
+        superview?.needsLayout = true
+        if focusing {
+            DispatchQueue.main.async { [weak self, weak field] in
+                guard let self, let field else { return }
+                self.window?.makeFirstResponder(field)
+            }
+        }
+    }
+
+    private func rebuildCommandActions() {
+        subviews.filter { $0.identifier?.rawValue.hasPrefix("command-action-") == true }
+            .forEach { $0.removeFromSuperview() }
+        commandActionTargets.removeAll()
+        for index in commandFields.indices {
+            let actions: [(String, Int, () -> Void)] = [
+                ("chevron.up", 0, { [weak self] in self?.moveCommand(at: index, offset: -1) }),
+                ("chevron.down", 1, { [weak self] in self?.moveCommand(at: index, offset: 1) }),
+                ("xmark", 2, { [weak self] in self?.removeCommand(at: index) })
+            ]
+            for (symbol, actionIndex, action) in actions {
+                let target = ButtonClosureTarget(action: action)
+                commandActionTargets.append(target)
+                let button = SidebarIconButton()
+                button.identifier = NSUserInterfaceItemIdentifier("command-action-\(index)-\(actionIndex)")
+                button.configure(symbol: symbol, toolTip: actionIndex == 2 ? "Remove Command" : "Move Command", target: target, action: #selector(ButtonClosureTarget.invoke(_:)))
+                button.contentTintColor = .tertiaryLabelColor
+                addSubview(button)
+            }
+        }
+    }
+
+    private func layoutCommandActions(at index: Int, y: CGFloat) {
+        for actionIndex in 0..<3 {
+            let identifier = NSUserInterfaceItemIdentifier("command-action-\(index)-\(actionIndex)")
+            guard let button = subviews.first(where: { $0.identifier == identifier }) else { continue }
+            button.frame = CGRect(x: bounds.width - 82 + CGFloat(actionIndex * 24), y: y, width: 22, height: 22)
+        }
+    }
+
+    private func moveCommand(at index: Int, offset: Int) {
+        let destination = index + offset
+        guard commandFields.indices.contains(index), commandFields.indices.contains(destination) else { return }
+        commandFields.swapAt(index, destination)
+        rebuildCommandActions()
+        needsLayout = true
+    }
+
+    private func removeCommand(at index: Int) {
+        guard commandFields.indices.contains(index) else { return }
+        let field = commandFields.remove(at: index)
+        field.removeFromSuperview()
+        if commandFields.isEmpty { addCommandField() }
+        rebuildCommandActions()
+        editorHeightConstraint?.constant = preferredHeight
+        needsLayout = true
+        superview?.needsLayout = true
     }
 }
 
@@ -381,9 +540,11 @@ private final class SnippetGroupHeaderView: NSView {
     private let toggleButton = SidebarIconButton()
     private let titleLabel: NSTextField
     private let addButton = SidebarIconButton()
+    private let editButton = SidebarIconButton()
     private let deleteButton = SidebarIconButton()
     private let toggleTarget: ButtonClosureTarget
     private let addTarget: ButtonClosureTarget
+    private let editTarget: ButtonClosureTarget
     private let deleteTarget: ButtonClosureTarget
 
     init(
@@ -391,11 +552,13 @@ private final class SnippetGroupHeaderView: NSView {
         isCollapsed: Bool,
         onToggle: @escaping () -> Void,
         onAdd: @escaping () -> Void,
+        onEdit: @escaping () -> Void,
         onDelete: @escaping () -> Void
     ) {
         titleLabel = NSTextField(labelWithString: title)
         toggleTarget = ButtonClosureTarget(action: onToggle)
         addTarget = ButtonClosureTarget(action: onAdd)
+        editTarget = ButtonClosureTarget(action: onEdit)
         deleteTarget = ButtonClosureTarget(action: onDelete)
         super.init(frame: .zero)
 
@@ -413,6 +576,9 @@ private final class SnippetGroupHeaderView: NSView {
 
         addButton.configure(symbol: "plus", toolTip: "Add Command", target: addTarget, action: #selector(ButtonClosureTarget.invoke(_:)))
         addSubview(addButton)
+        editButton.configure(symbol: "pencil", toolTip: "Rename Group", target: editTarget, action: #selector(ButtonClosureTarget.invoke(_:)))
+        editButton.contentTintColor = .tertiaryLabelColor
+        addSubview(editButton)
         deleteButton.configure(symbol: "trash", toolTip: "Delete Group", target: deleteTarget, action: #selector(ButtonClosureTarget.invoke(_:)))
         deleteButton.contentTintColor = .tertiaryLabelColor
         addSubview(deleteButton)
@@ -425,9 +591,24 @@ private final class SnippetGroupHeaderView: NSView {
     override func layout() {
         super.layout()
         toggleButton.frame = CGRect(x: 0, y: 3, width: 22, height: 22)
-        titleLabel.frame = CGRect(x: 26, y: 4, width: max(0, bounds.width - 82), height: 20)
+        titleLabel.frame = CGRect(x: 26, y: 4, width: max(0, bounds.width - 106), height: 20)
         deleteButton.frame = CGRect(x: bounds.width - 23, y: 3, width: 22, height: 22)
-        addButton.frame = CGRect(x: deleteButton.frame.minX - 24, y: 3, width: 22, height: 22)
+        editButton.frame = CGRect(x: deleteButton.frame.minX - 24, y: 3, width: 22, height: 22)
+        addButton.frame = CGRect(x: editButton.frame.minX - 24, y: 3, width: 22, height: 22)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 {
+            editTarget.invoke(self)
+        }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let localPoint = convert(point, from: superview)
+        for button in [toggleButton, addButton, editButton, deleteButton] where button.frame.contains(localPoint) {
+            return button.hitTest(localPoint)
+        }
+        return bounds.contains(localPoint) ? self : nil
     }
 }
 
@@ -437,9 +618,11 @@ private final class SnippetCommandRow: NSView {
     private let titleLabel: NSTextField
     private let commandLabel: NSTextField
     private let runButton = SidebarIconButton()
+    private let editButton = SidebarIconButton()
     private let deleteButton = SidebarIconButton()
     private let insertTarget: ButtonClosureTarget
     private let runTarget: ButtonClosureTarget
+    private let editTarget: ButtonClosureTarget
     private let deleteTarget: ButtonClosureTarget
     private var trackingArea: NSTrackingArea?
     private var isHovered = false
@@ -448,12 +631,19 @@ private final class SnippetCommandRow: NSView {
         snippet: CommandSnippet,
         onInsert: @escaping () -> Void,
         onRun: @escaping () -> Void,
+        onEdit: @escaping () -> Void,
         onDelete: @escaping () -> Void
     ) {
+        let commands = snippet.command
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let preview = commands.first ?? snippet.command
         titleLabel = NSTextField(labelWithString: snippet.name)
-        commandLabel = NSTextField(labelWithString: snippet.command)
+        commandLabel = NSTextField(labelWithString: commands.count > 1 ? "\(commands.count) commands  ·  \(preview)" : preview)
         insertTarget = ButtonClosureTarget(action: onInsert)
         runTarget = ButtonClosureTarget(action: onRun)
+        editTarget = ButtonClosureTarget(action: onEdit)
         deleteTarget = ButtonClosureTarget(action: onDelete)
         super.init(frame: .zero)
         wantsLayer = true
@@ -473,8 +663,11 @@ private final class SnippetCommandRow: NSView {
         commandLabel.lineBreakMode = .byTruncatingMiddle
         addSubview(commandLabel)
 
-        runButton.configure(symbol: "play.fill", toolTip: "Run Command", target: runTarget, action: #selector(ButtonClosureTarget.invoke(_:)))
+        runButton.configure(symbol: "play.fill", toolTip: "Run Snippet", target: runTarget, action: #selector(ButtonClosureTarget.invoke(_:)))
         addSubview(runButton)
+        editButton.configure(symbol: "pencil", toolTip: "Edit Snippet", target: editTarget, action: #selector(ButtonClosureTarget.invoke(_:)))
+        editButton.contentTintColor = .tertiaryLabelColor
+        addSubview(editButton)
         deleteButton.configure(symbol: "xmark", toolTip: "Delete Command", target: deleteTarget, action: #selector(ButtonClosureTarget.invoke(_:)))
         deleteButton.contentTintColor = .tertiaryLabelColor
         addSubview(deleteButton)
@@ -487,11 +680,12 @@ private final class SnippetCommandRow: NSView {
     override func layout() {
         super.layout()
         iconView.frame = CGRect(x: 10, y: 14, width: 18, height: 18)
-        let actionsWidth: CGFloat = isHovered ? 49 : 25
+        let actionsWidth: CGFloat = isHovered ? 73 : 25
         titleLabel.frame = CGRect(x: 36, y: 23, width: max(0, bounds.width - 46 - actionsWidth), height: 17)
         commandLabel.frame = CGRect(x: 36, y: 7, width: max(0, bounds.width - 46 - actionsWidth), height: 14)
         runButton.frame = CGRect(x: bounds.width - 28, y: 11, width: 23, height: 24)
-        deleteButton.frame = CGRect(x: runButton.frame.minX - 24, y: 11, width: 22, height: 24)
+        editButton.frame = CGRect(x: runButton.frame.minX - 24, y: 11, width: 22, height: 24)
+        deleteButton.frame = CGRect(x: editButton.frame.minX - 24, y: 11, width: 22, height: 24)
     }
 
     override func updateTrackingAreas() {
@@ -513,13 +707,20 @@ private final class SnippetCommandRow: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        insertTarget.invoke(self)
+        if event.clickCount == 2 {
+            editTarget.invoke(self)
+        } else {
+            insertTarget.invoke(self)
+        }
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         let localPoint = convert(point, from: superview)
         if runButton.frame.contains(localPoint) {
             return runButton.hitTest(localPoint)
+        }
+        if !editButton.isHidden, editButton.frame.contains(localPoint) {
+            return editButton.hitTest(localPoint)
         }
         if !deleteButton.isHidden, deleteButton.frame.contains(localPoint) {
             return deleteButton.hitTest(localPoint)
@@ -531,6 +732,7 @@ private final class SnippetCommandRow: NSView {
         layer?.backgroundColor = isHovered
             ? NSColor.systemPurple.withAlphaComponent(0.14).cgColor
             : NSColor.white.withAlphaComponent(0.025).cgColor
+        editButton.isHidden = !isHovered
         deleteButton.isHidden = !isHovered
         runButton.contentTintColor = isHovered ? .controlAccentColor : .secondaryLabelColor
         needsLayout = true

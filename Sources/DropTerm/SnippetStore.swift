@@ -48,6 +48,12 @@ final class SnippetStore {
         persist()
     }
 
+    func renameGroup(id: UUID, to name: String) {
+        guard let index = groups.firstIndex(where: { $0.id == id }) else { return }
+        groups[index].name = name
+        persist()
+    }
+
     func addSnippet(name: String, command: String, to groupID: UUID) {
         guard let index = groups.firstIndex(where: { $0.id == groupID }) else { return }
         groups[index].snippets.append(CommandSnippet(name: name, command: command))
@@ -57,6 +63,16 @@ final class SnippetStore {
     func removeSnippet(id: UUID, from groupID: UUID) {
         guard let index = groups.firstIndex(where: { $0.id == groupID }) else { return }
         groups[index].snippets.removeAll { $0.id == id }
+        persist()
+    }
+
+    func updateSnippet(id: UUID, in groupID: UUID, name: String, command: String) {
+        guard let groupIndex = groups.firstIndex(where: { $0.id == groupID }),
+              let snippetIndex = groups[groupIndex].snippets.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        groups[groupIndex].snippets[snippetIndex].name = name
+        groups[groupIndex].snippets[snippetIndex].command = command
         persist()
     }
 
