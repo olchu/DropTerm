@@ -21,7 +21,7 @@ xcodebuild \
   -scheme DropTerm \
   -configuration Release \
   -derivedDataPath "$DERIVED_DATA_PATH" \
-  -destination 'platform=macOS' \
+  -destination 'generic/platform=macOS' \
   build
 
 ditto "$APP_PATH" "$STAGING_DIR/DropTerm.app"
