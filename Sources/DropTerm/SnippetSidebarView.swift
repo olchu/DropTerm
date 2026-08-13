@@ -14,7 +14,7 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
     private let searchField = NSTextField()
     private let addGroupButton = SidebarIconButton()
     private let closeButton = SidebarIconButton()
-    private let scrollView = NSScrollView()
+    private let scrollView = SidebarScrollView()
     private let stack = FlippedStackView()
     private let verticalSeparator = NSView()
     private let headerSeparator = NSView()
@@ -129,6 +129,7 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
+        scrollView.onSwipeRight = { [weak self] in self?.onClose?() }
         addSubview(scrollView)
 
         stack.orientation = .vertical
@@ -798,6 +799,42 @@ private final class SidebarIconButton: NSButton {
 
 private final class FlippedStackView: NSStackView {
     override var isFlipped: Bool { true }
+}
+
+private final class SidebarScrollView: NSScrollView {
+    var onSwipeRight: (() -> Void)?
+    private var gestureTranslation = CGPoint.zero
+    private var didTriggerSwipe = false
+
+    override func scrollWheel(with event: NSEvent) {
+        guard event.hasPreciseScrollingDeltas, event.momentumPhase.isEmpty else {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        if event.phase == .mayBegin || event.phase == .began {
+            gestureTranslation = .zero
+            didTriggerSwipe = false
+        }
+        guard !didTriggerSwipe else { return }
+
+        gestureTranslation.x += event.scrollingDeltaX
+        gestureTranslation.y += event.scrollingDeltaY
+        let horizontalDistance = abs(gestureTranslation.x)
+
+        if gestureTranslation.x > 0,
+           horizontalDistance >= 42,
+           horizontalDistance > abs(gestureTranslation.y) {
+            didTriggerSwipe = true
+            onSwipeRight?()
+            return
+        }
+
+        if event.phase == .ended || event.phase == .cancelled {
+            gestureTranslation = .zero
+        }
+        super.scrollWheel(with: event)
+    }
 }
 
 private final class SidebarDecorationView: NSView {
