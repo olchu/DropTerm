@@ -7,14 +7,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settingsWindowController = SettingsWindowController(settings: settings)
     private var hotKeyService: GlobalHotKeyService?
     private var statusItem: NSStatusItem?
+    private var workspaceActivationObserver: NSObjectProtocol?
+    private var isHotKeySuppressedForParallels: Bool?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         applyBundleIcon()
         installMainMenu()
         installStatusItem()
-        installGlobalHotKey()
+        observeWorkspaceActivation()
+        updateHotKeyRegistration(for: NSWorkspace.shared.frontmostApplication)
         settings.onHotKeyChange = { [weak self] in
+            guard self?.isHotKeySuppressedForParallels == false else { return }
             self?.installGlobalHotKey()
         }
 
@@ -41,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         hotKeyService?.invalidate()
         hotKeyService = nil
+        if let workspaceActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(workspaceActivationObserver)
+        }
         panelController.terminateSession()
     }
 
@@ -192,6 +199,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } catch {
             NSLog("DropTerm could not register %@: %@", settings.globalShortcut.displayName, error.localizedDescription)
+        }
+    }
+
+    private func observeWorkspaceActivation() {
+        workspaceActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                as? NSRunningApplication
+            else {
+                return
+            }
+
+            Task { @MainActor [weak self] in
+                self?.updateHotKeyRegistration(for: application)
+            }
+        }
+    }
+
+    private func updateHotKeyRegistration(for application: NSRunningApplication?) {
+        let shouldSuppress = application?.bundleIdentifier?.hasPrefix("com.parallels.") == true
+        guard shouldSuppress != isHotKeySuppressedForParallels else { return }
+
+        isHotKeySuppressedForParallels = shouldSuppress
+
+        if shouldSuppress {
+            panelController.hide()
+            hotKeyService?.invalidate()
+            hotKeyService = nil
+        } else {
+            installGlobalHotKey()
         }
     }
 }
