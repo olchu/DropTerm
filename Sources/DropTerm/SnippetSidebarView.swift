@@ -1,13 +1,14 @@
 import AppKit
 
 @MainActor
-final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
+final class SnippetSidebarView: NSVisualEffectView, NSSearchFieldDelegate {
     var onRunCommand: ((String) -> Void)?
     var onInsertCommand: ((String) -> Void)?
     var onClose: (() -> Void)?
     var contentBottomInset: CGFloat = 0
 
     private let store: SnippetStore
+    private let tintOverlay = SidebarDecorationView()
     private let titleLabel = NSTextField(labelWithString: "Snippets")
     private let searchBorder = SidebarDecorationView()
     private let searchIcon = NSImageView()
@@ -80,13 +81,18 @@ final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
     }
 
     private func configureAppearance() {
+        material = .hudWindow
+        blendingMode = .behindWindow
+        state = .active
+        isEmphasized = false
         wantsLayer = true
-        layer?.backgroundColor = NSColor(
-            calibratedRed: 0.055,
-            green: 0.045,
-            blue: 0.070,
-            alpha: 0.97
-        ).cgColor
+
+        tintOverlay.wantsLayer = true
+        tintOverlay.layer?.backgroundColor = AppColors.panelBackground(tint: 0.25, alpha: 0.18).cgColor
+        tintOverlay.autoresizingMask = [.width, .height]
+        tintOverlay.frame = bounds
+        addSubview(tintOverlay)
+
         headerSeparator.wantsLayer = true
         headerSeparator.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.09).cgColor
         addSubview(headerSeparator)

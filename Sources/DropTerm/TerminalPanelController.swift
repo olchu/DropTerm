@@ -726,12 +726,7 @@ private final class AICommandBarView: NSView, NSTextFieldDelegate {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.backgroundColor = NSColor(
-            calibratedRed: 0.065,
-            green: 0.052,
-            blue: 0.080,
-            alpha: 0.98
-        ).cgColor
+        layer?.backgroundColor = AppColors.panelBackground(tint: 0.09, alpha: 0.98).cgColor
         layer?.cornerRadius = 14
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
