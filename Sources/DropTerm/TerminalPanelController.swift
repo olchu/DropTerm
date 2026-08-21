@@ -9,6 +9,7 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
     private var isVisible = false
     private var appliedStartingDirectory: String
     private var inputSourceBeforeShowing: TISInputSource?
+    private var blurRepairGeneration = 0
 
     init(settings: AppSettings = .shared) {
         self.settings = settings
@@ -18,10 +19,19 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         settings.onChange = { [weak self] in
             self?.applySettings()
         }
+        observeActiveSpaceChanges()
     }
 
     func toggle() {
-        isVisible ? hide() : show()
+        if isVisible {
+            if isPanelVisibleOnActiveSpace {
+                hide()
+            } else {
+                presentVisiblePanelOnActiveSpace(focus: true)
+            }
+        } else {
+            show()
+        }
     }
 
     func show() {
@@ -35,12 +45,14 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         terminalTabs.setBottomBackdropHeight(layout.bottomBackdropHeight(for: screen))
         panel.setFrame(frames.hidden, display: false)
         panel.orderFrontRegardless()
+        reassertClearPanelBacking()
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKey()
         selectEnglishInputSource()
         terminalTabs.focusTerminal()
 
         isVisible = true
+        applyWindowBlur()
 
         guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             panel.setFrame(frames.visible, display: true)
@@ -134,7 +146,7 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
 
     private func applySettings() {
         terminalTabs.applySettings()
-        panel.alphaValue = settings.panelOpacity
+        panel.alphaValue = 1
         if appliedStartingDirectory != settings.startingDirectory {
             appliedStartingDirectory = settings.startingDirectory
             terminalTabs.applyStartingDirectory()
@@ -143,11 +155,9 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
 
         guard isVisible, let screen = panel.screen ?? NSScreen.main else { return }
         terminalTabs.setBottomBackdropHeight(layout.bottomBackdropHeight(for: screen))
-        panel.setFrame(
-            layout.frames(screenFrame: screen.frame, visibleFrame: screen.visibleFrame).visible,
-            display: true,
-            animate: false
-        )
+        let visibleFrame = layout.frames(screenFrame: screen.frame, visibleFrame: screen.visibleFrame).visible
+        panel.setFrame(visibleFrame, display: true, animate: false)
+        applyWindowBlur()
         terminalTabs.focusTerminal()
     }
 
@@ -160,17 +170,87 @@ final class TerminalPanelController: NSObject, NSWindowDelegate {
         )
         panel.isFloatingPanel = true
         panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .transient]
         panel.hidesOnDeactivate = settings.hideOnDeactivate
         panel.appearance = NSAppearance(named: .darkAqua)
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.alphaValue = settings.panelOpacity
+        panel.alphaValue = 1
         panel.hasShadow = false
         panel.isMovable = false
         panel.contentView = terminalTabs
         panel.delegate = self
         return panel
+    }
+
+    private func applyWindowBlur() {
+        reassertClearPanelBacking()
+        WindowBackgroundBlur.setRadius(
+            UInt32(min(max(settings.backgroundBlurRadius, 0), 80)),
+            for: panel
+        )
+    }
+
+    private func reassertClearPanelBacking() {
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.alphaValue = 1
+    }
+
+    private func observeActiveSpaceChanges() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(activeSpaceDidChange(_:)),
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func activeSpaceDidChange(_ notification: Notification) {
+        repairWindowBlurAfterSpaceChange()
+    }
+
+    private func repairWindowBlurAfterSpaceChange() {
+        guard isVisible else { return }
+        blurRepairGeneration += 1
+        let generation = blurRepairGeneration
+
+        presentVisiblePanelOnActiveSpace(focus: false)
+
+        Task { @MainActor [weak self] in
+            for delay in [120, 320, 650] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard
+                    let self,
+                    self.isVisible,
+                    self.blurRepairGeneration == generation
+                else { return }
+
+                self.presentVisiblePanelOnActiveSpace(focus: false)
+            }
+        }
+    }
+
+    private var isPanelVisibleOnActiveSpace: Bool {
+        panel.isVisible && panel.occlusionState.contains(.visible)
+    }
+
+    private func presentVisiblePanelOnActiveSpace(focus: Bool) {
+        guard let screen = screenUnderPointer() ?? panel.screen ?? NSScreen.main else { return }
+        let frames = layout.frames(screenFrame: screen.frame, visibleFrame: screen.visibleFrame)
+        terminalTabs.setBottomBackdropHeight(layout.bottomBackdropHeight(for: screen))
+        panel.setFrame(frames.visible, display: true, animate: false)
+        reassertClearPanelBacking()
+        WindowBackgroundBlur.setRadius(0, for: panel)
+        panel.orderFrontRegardless()
+        applyWindowBlur()
+
+        if focus {
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKey()
+            selectEnglishInputSource()
+            terminalTabs.focusTerminal()
+        }
     }
 
     private func screenUnderPointer() -> NSScreen? {
@@ -223,7 +303,7 @@ private final class TerminalTabsView: NSView {
         self.settings = settings
         let snippetStore = SnippetStore()
         self.snippetStore = snippetStore
-        snippetSidebar = SnippetSidebarView(store: snippetStore)
+        snippetSidebar = SnippetSidebarView(store: snippetStore, settings: settings)
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 18
@@ -318,7 +398,10 @@ private final class TerminalTabsView: NSView {
     func selectAllText() { activeSurface?.selectAllText() }
     func copyLastCommandOutput() { activeSurface?.copyLastCommandOutput() }
     func applyStartingDirectory() { activeSurface?.applyStartingDirectory() }
-    func applySettings() { tabs.forEach { $0.surface.applySettings() } }
+    func applySettings() {
+        tabs.forEach { $0.surface.applySettings() }
+        snippetSidebar.applySettings()
+    }
     func terminateSessions() { tabs.forEach { $0.surface.terminateSession() } }
 
     func resetSnippetSidebar() {

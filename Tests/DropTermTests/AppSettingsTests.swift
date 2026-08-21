@@ -14,6 +14,8 @@ struct AppSettingsTests {
         let settings = AppSettings(defaults: defaults)
         settings.panelHeightRatio = 0.55
         settings.backgroundOpacity = 0.24
+        settings.backgroundBlurRadius = 48
+        settings.snippetBlurRadius = 24
         settings.panelOpacity = 0.72
         settings.contentPadding = 18
         settings.fontSize = 16
@@ -31,6 +33,8 @@ struct AppSettingsTests {
         let restored = AppSettings(defaults: defaults)
         #expect(restored.panelHeightRatio == 0.55)
         #expect(restored.backgroundOpacity == 0.24)
+        #expect(restored.backgroundBlurRadius == 48)
+        #expect(restored.snippetBlurRadius == 24)
         #expect(restored.panelOpacity == 0.72)
         #expect(restored.contentPadding == 18)
         #expect(restored.fontSize == 16)
@@ -53,10 +57,14 @@ struct AppSettingsTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(2.0, forKey: "panel.heightRatio")
         defaults.set(-1.0, forKey: "appearance.backgroundOpacity")
+        defaults.set(120.0, forKey: "appearance.backgroundBlurRadius")
+        defaults.set(120.0, forKey: "appearance.snippetBlurRadius")
 
         let settings = AppSettings(defaults: defaults)
 
         #expect(settings.panelHeightRatio == 0.8)
         #expect(settings.backgroundOpacity == 0)
+        #expect(settings.backgroundBlurRadius == 80)
+        #expect(settings.snippetBlurRadius == 80)
     }
 }

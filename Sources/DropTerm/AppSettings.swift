@@ -29,6 +29,14 @@ final class AppSettings {
         didSet { persist(backgroundOpacity, for: .backgroundOpacity) }
     }
 
+    var backgroundBlurRadius: Double {
+        didSet { persist(backgroundBlurRadius, for: .backgroundBlurRadius) }
+    }
+
+    var snippetBlurRadius: Double {
+        didSet { persist(snippetBlurRadius, for: .snippetBlurRadius) }
+    }
+
     var panelOpacity: Double {
         didSet { persist(panelOpacity, for: .panelOpacity) }
     }
@@ -108,6 +116,18 @@ final class AppSettings {
             default: 0.12,
             range: 0...0.6
         )
+        backgroundBlurRadius = Self.double(
+            in: defaults,
+            key: .backgroundBlurRadius,
+            default: 32,
+            range: 0...80
+        )
+        snippetBlurRadius = Self.double(
+            in: defaults,
+            key: .snippetBlurRadius,
+            default: 32,
+            range: 0...80
+        )
         panelOpacity = Self.double(
             in: defaults,
             key: .panelOpacity,
@@ -169,6 +189,8 @@ final class AppSettings {
     private enum Key: String, CaseIterable {
         case panelHeightRatio = "panel.heightRatio"
         case backgroundOpacity = "appearance.backgroundOpacity"
+        case backgroundBlurRadius = "appearance.backgroundBlurRadius"
+        case snippetBlurRadius = "appearance.snippetBlurRadius"
         case panelOpacity = "appearance.panelOpacity"
         case contentPadding = "appearance.contentPadding"
         case fontSize = "terminal.fontSize"

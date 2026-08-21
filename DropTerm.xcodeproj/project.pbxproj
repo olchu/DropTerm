@@ -16,6 +16,7 @@
 		5ADD240B3257B34892F03C7C /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF703597FE07EF4A06EBB618 /* AppSettings.swift */; };
 		6AD0466835C5DC461996B4DC /* TerminalPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9FC0B67B039441E23442B86 /* TerminalPanelController.swift */; };
 		7242F2FBBD2A7407CA26323A /* TerminalSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC06813C8DD1E8757FC3E073 /* TerminalSurfaceView.swift */; };
+		83D9BA48007A4B72970FE9D4 /* WindowBackgroundBlur.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0448CFA6B9064979947A1958 /* WindowBackgroundBlur.swift */; };
 		96827B9B4CCCF3927100DF53 /* SnippetStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5ABCC3A1434F733D1DEED25 /* SnippetStoreTests.swift */; };
 		A261596FA6D0CCE5EFC9C3C0 /* SnippetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA863567E0FD888E0D3969FF /* SnippetStore.swift */; };
 		C84DF86B798CCCF07790150B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EED1B49A22EE764525092AFD /* Assets.xcassets */; };
@@ -40,6 +41,7 @@
 
 /* Begin PBXFileReference section */
 		31DA52A161533243A55F210F /* OllamaCommandService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OllamaCommandService.swift; sourceTree = "<group>"; };
+		0448CFA6B9064979947A1958 /* WindowBackgroundBlur.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WindowBackgroundBlur.swift; sourceTree = "<group>"; };
 		4864FDA42A165381CACF4DBA /* GlobalHotKeyService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyService.swift; sourceTree = "<group>"; };
 		4DB40D0D155AF766F9DAF452 /* DropTermApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DropTermApp.swift; sourceTree = "<group>"; };
 		57917656C83BB6027D1110DA /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 				DA863567E0FD888E0D3969FF /* SnippetStore.swift */,
 				E9FC0B67B039441E23442B86 /* TerminalPanelController.swift */,
 				DC06813C8DD1E8757FC3E073 /* TerminalSurfaceView.swift */,
+				0448CFA6B9064979947A1958 /* WindowBackgroundBlur.swift */,
 			);
 			name = DropTerm;
 			path = Sources/DropTerm;
@@ -276,6 +279,7 @@
 				A261596FA6D0CCE5EFC9C3C0 /* SnippetStore.swift in Sources */,
 				6AD0466835C5DC461996B4DC /* TerminalPanelController.swift in Sources */,
 				7242F2FBBD2A7407CA26323A /* TerminalSurfaceView.swift in Sources */,
+				83D9BA48007A4B72970FE9D4 /* WindowBackgroundBlur.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

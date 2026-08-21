@@ -1,13 +1,15 @@
 import AppKit
+import CoreImage
 
 @MainActor
-final class SnippetSidebarView: NSVisualEffectView, NSSearchFieldDelegate {
+final class SnippetSidebarView: NSView, NSSearchFieldDelegate {
     var onRunCommand: ((String) -> Void)?
     var onInsertCommand: ((String) -> Void)?
     var onClose: (() -> Void)?
     var contentBottomInset: CGFloat = 0
 
     private let store: SnippetStore
+    private let settings: AppSettings
     private let tintOverlay = SidebarDecorationView()
     private let titleLabel = NSTextField(labelWithString: "Snippets")
     private let searchBorder = SidebarDecorationView()
@@ -29,8 +31,9 @@ final class SnippetSidebarView: NSVisualEffectView, NSSearchFieldDelegate {
         case editSnippet(groupID: UUID, snippetID: UUID)
     }
 
-    init(store: SnippetStore) {
+    init(store: SnippetStore, settings: AppSettings) {
         self.store = store
+        self.settings = settings
         super.init(frame: .zero)
         configureAppearance()
         configureHeader()
@@ -49,6 +52,11 @@ final class SnippetSidebarView: NSVisualEffectView, NSSearchFieldDelegate {
     override func mouseMoved(with event: NSEvent) {
         NSCursor.arrow.set()
         super.mouseMoved(with: event)
+    }
+
+    func applySettings() {
+        applyInternalBlur()
+        tintOverlay.layer?.backgroundColor = Self.overlayColor(settings: settings).cgColor
     }
 
     override func layout() {
@@ -81,14 +89,13 @@ final class SnippetSidebarView: NSVisualEffectView, NSSearchFieldDelegate {
     }
 
     private func configureAppearance() {
-        material = .hudWindow
-        blendingMode = .behindWindow
-        state = .active
-        isEmphasized = false
         wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.masksToBounds = true
+        applyInternalBlur()
 
         tintOverlay.wantsLayer = true
-        tintOverlay.layer?.backgroundColor = AppColors.panelBackground(tint: 0.25, alpha: 0.18).cgColor
+        tintOverlay.layer?.backgroundColor = Self.overlayColor(settings: settings).cgColor
         tintOverlay.autoresizingMask = [.width, .height]
         tintOverlay.frame = bounds
         addSubview(tintOverlay)
@@ -96,6 +103,22 @@ final class SnippetSidebarView: NSVisualEffectView, NSSearchFieldDelegate {
         headerSeparator.wantsLayer = true
         headerSeparator.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.09).cgColor
         addSubview(headerSeparator)
+    }
+
+    private static func overlayColor(settings: AppSettings) -> NSColor {
+        let alpha = min(0.72, max(0.18, settings.backgroundOpacity + 0.18))
+        return NSColor.black.withAlphaComponent(alpha)
+    }
+
+    private func applyInternalBlur() {
+        guard settings.snippetBlurRadius > 0 else {
+            layer?.backgroundFilters = []
+            return
+        }
+
+        let blurFilter = CIFilter(name: "CIGaussianBlur")
+        blurFilter?.setValue(settings.snippetBlurRadius, forKey: kCIInputRadiusKey)
+        layer?.backgroundFilters = blurFilter.map { [$0] } ?? []
     }
 
     private func configureHeader() {

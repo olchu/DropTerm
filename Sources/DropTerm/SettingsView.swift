@@ -25,12 +25,16 @@ struct SettingsView: View {
                     )
                 )
                 sliderRow(
-                    title: "App transparency",
-                    value: $settings.panelOpacity,
-                    range: 0.45...1,
-                    valueLabel: settings.panelOpacity.formatted(
-                        .percent.precision(.fractionLength(0))
-                    )
+                    title: "Window blur",
+                    value: $settings.backgroundBlurRadius,
+                    range: 0...80,
+                    valueLabel: "\(Int(settings.backgroundBlurRadius)) px"
+                )
+                sliderRow(
+                    title: "Snippet blur",
+                    value: $settings.snippetBlurRadius,
+                    range: 0...80,
+                    valueLabel: "\(Int(settings.snippetBlurRadius)) px"
                 )
                 sliderRow(
                     title: "Content padding",

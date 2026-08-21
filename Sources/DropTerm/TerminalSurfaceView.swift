@@ -1,8 +1,9 @@
 import AppKit
+import QuartzCore
 @preconcurrency import SwiftTerm
 
 @MainActor
-final class TerminalSurfaceView: NSVisualEffectView {
+final class TerminalSurfaceView: NSView {
     var onTitleChange: ((String) -> Void)?
     var onProcessTermination: (() -> Void)?
 
@@ -187,10 +188,6 @@ final class TerminalSurfaceView: NSVisualEffectView {
     }
 
     private func configureAppearance() {
-        material = .hudWindow
-        isEmphasized = false
-        blendingMode = .behindWindow
-        state = .active
         wantsLayer = true
         layer?.cornerRadius = cornerRadius
         layer?.cornerCurve = .continuous
@@ -490,6 +487,7 @@ final class TerminalSurfaceView: NSVisualEffectView {
         case (.underline, true): .blinkUnderline
         }
     }
+
 }
 
 extension TerminalSurfaceView: @preconcurrency LocalProcessTerminalViewDelegate {
